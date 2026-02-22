@@ -1,0 +1,12 @@
+[
+  {
+    "username": "admin",
+    "passwordHash": "$2b$10$xvA5t8.McMpvtutLXyy4TOQ3VU5I9w0ZojqhwbDzb8ibzm.YZB7Na",
+    "avatar": "https://i.pravatar.cc/128?u=admin"
+  },
+  {
+    "username": "trefmat",
+    "passwordHash": "$2b$10$C4D6tEKbIzCpauUlriIFdOOYSStIxTwibHDybwEJ5KYKmq8oZFliC",
+    "avatar": "https://i.pravatar.cc/128?u=trefmat"
+  }
+]

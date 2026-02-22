@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptoChat • E2EE</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap');
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .logo-font { font-family: 'Space Grotesk', sans-serif; }
+        .chat-bg { background-image: linear-gradient(rgba(0,0,0,0.75), rgba(0,0,0,0.75)), url('https://picsum.photos/id/1015/1920/1080'); background-size: cover; background-position: center; }
+        .message-bubble { max-width: 70%; padding: 14px 18px; border-radius: 22px; position: relative; }
+        .message-bubble.me { background: #10b981; color: white; border-bottom-right-radius: 4px; }
+        .message-bubble.them { background: #27272a; border-bottom-left-radius: 4px; }
+        .scrollbar-thin::-webkit-scrollbar { width: 4px; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 20px; }
+    </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 h-screen overflow-hidden">
+
+    <!-- ЛОГИН -->
+    <div id="login-screen" class="flex items-center justify-center h-full">
+        <div class="bg-zinc-900 rounded-3xl w-full max-w-md p-10 shadow-2xl">
+            <div class="flex justify-center mb-6">
+                <div class="flex items-center gap-3 text-5xl">
+                    <span>🔒</span>
+                    <span class="logo-font font-bold tracking-tighter">CryptoChat</span>
+                </div>
+            </div>
+            <h2 class="text-center text-2xl font-semibold mb-8">Вход в защищённый чат</h2>
+            <input id="username" type="text" placeholder="Логин" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 mb-4 outline-none focus:border-emerald-500">
+            <input id="password" type="password" placeholder="Пароль" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 mb-8 outline-none focus:border-emerald-500">
+            <button onclick="login()" class="w-full bg-emerald-500 hover:bg-emerald-600 py-4 rounded-2xl font-semibold text-lg transition">Войти</button>
+            <p class="text-center text-xs text-zinc-500 mt-10">Только администратор выдаёт логины и пароли</p>
+        </div>
+    </div>
+
+    <!-- ЧАТ -->
+    <div id="chat-screen" class="hidden h-full flex flex-col md:flex-row">
+        <!-- SIDEBAR -->
+        <div class="w-full md:w-80 bg-zinc-900 border-r border-zinc-800 flex flex-col">
+            <div class="p-5 border-b border-zinc-800 flex items-center gap-3">
+                <img id="my-avatar" src="" class="w-10 h-10 rounded-2xl ring-2 ring-emerald-500">
+                <div class="flex-1">
+                    <div id="my-name" class="font-semibold"></div>
+                    <div class="text-emerald-400 text-xs flex items-center gap-1">
+                        <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                        онлайн
+                    </div>
+                </div>
+                <button onclick="logout()" class="text-zinc-400 hover:text-red-400"><i class="fa-solid fa-right-from-bracket"></i></button>
+            </div>
+
+            <div class="p-4">
+                <div class="relative">
+                    <input id="search" type="text" placeholder="Поиск контактов..." class="w-full bg-zinc-800 border border-zinc-700 rounded-3xl py-3 px-5 pl-12 outline-none">
+                    <i class="fa-solid fa-magnifying-glass absolute left-5 top-3.5 text-zinc-500"></i>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto scrollbar-thin" id="chats-list"></div>
+
+            <div class="p-4 border-t border-zinc-800">
+                <button onclick="newChatPrompt()" class="w-full bg-zinc-800 hover:bg-zinc-700 py-3 rounded-2xl flex items-center justify-center gap-2 text-emerald-400">
+                    <i class="fa-solid fa-plus"></i> Новый чат
+                </button>
+            </div>
+        </div>
+
+        <!-- MAIN -->
+        <div class="flex-1 flex flex-col">
+            <div class="h-16 bg-zinc-900 border-b border-zinc-800 px-6 flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <button onclick="toggleMobileSidebar()" class="md:hidden text-3xl text-zinc-400">☰</button>
+                    <div id="chat-header-avatar" class="w-10 h-10 rounded-2xl overflow-hidden ring-2 ring-emerald-500/30"></div>
+                    <div>
+                        <div id="chat-header-name" class="font-semibold text-lg">Выберите чат</div>
+                        <div id="chat-header-status" class="text-emerald-400 text-xs">● онлайн</div>
+                    </div>
+                </div>
+                <div class="flex gap-6">
+                    <button onclick="simulateMessage()" class="flex items-center gap-2 text-sm text-zinc-400 hover:text-white"><i class="fa-solid fa-arrow-down"></i> Симулировать</button>
+                    <button onclick="showKeyModal()" class="text-zinc-400 hover:text-white"><i class="fa-solid fa-key"></i></button>
+                </div>
+            </div>
+
+            <div id="messages" class="flex-1 overflow-y-auto p-6 chat-bg scrollbar-thin space-y-6"></div>
+
+            <div class="bg-zinc-900 border-t border-zinc-800 p-5">
+                <div class="max-w-3xl mx-auto flex gap-3">
+                    <input id="message-input" onkeydown="if(event.key==='Enter') sendMessage()" placeholder="Напишите сообщение..." class="flex-1 bg-zinc-800 border border-zinc-700 focus:border-emerald-500 rounded-3xl py-4 px-6 outline-none">
+                    <button onclick="sendMessage()" class="bg-emerald-500 hover:bg-emerald-600 w-14 h-14 rounded-3xl flex items-center justify-center text-2xl transition shadow-xl"><i class="fa-solid fa-paper-plane"></i></button>
+                </div>
+                <div class="text-center text-[10px] text-zinc-500 mt-4">AES-256 E2EE • сообщения хранятся зашифрованными</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL KEY -->
+    <div id="key-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50">
+        <div class="bg-zinc-900 rounded-3xl p-8 max-w-sm w-full mx-4">
+            <h3 class="text-2xl font-semibold mb-6 flex items-center gap-3"><i class="fa-solid fa-key text-emerald-400"></i> Секретный ключ чата</h3>
+            <input id="key-input" type="text" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 text-lg outline-none" placeholder="Введите общий ключ (мин. 8 символов)">
+            <div class="mt-8 flex gap-3">
+                <button onclick="closeKeyModal()" class="flex-1 py-4 border border-zinc-700 rounded-2xl hover:bg-zinc-800">Отмена</button>
+                <button onclick="saveKey()" class="flex-1 py-4 bg-emerald-500 hover:bg-emerald-600 rounded-2xl font-medium">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let currentUser = null;
+        let currentChatId = null;
+        let currentChatPartner = null;
+        let chatKeys = JSON.parse(localStorage.getItem('chatKeys') || '{}');
+
+        async function login() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            if (!username || !password) return alert('Введите логин и пароль');
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                if (data.error) return alert(data.error);
+
+                currentUser = data;
+                localStorage.setItem('token', data.token);
+
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('chat-screen').classList.remove('hidden');
+
+                document.getElementById('my-avatar').src = currentUser.avatar;
+                document.getElementById('my-name').textContent = currentUser.username;
+
+                initSocket();
+            } catch (e) {
+                alert('Ошибка подключения');
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            location.reload();
+        }
+
+        function initSocket() {
+            socket = io({ auth: { token: currentUser.token } });
+
+            socket.on('connect', () => socket.emit('get-chats'));
+
+            socket.on('your-chats', renderChatsList);
+
+            socket.on('chat-history', messages => renderMessages(messages, false));
+
+            socket.on('new-message', msg => {
+                // Если это не текущий открытый чат — игнорируем
+                if (msg.chatId !== currentChatId) return;
+
+                // Показываем ВСЕ сообщения в этом чате, включая свои (если вдруг не показали локально)
+                renderMessages([msg], true);
+            });
+        }
+
+        function renderChatsList(usernames) {
+            const container = document.getElementById('chats-list');
+            container.innerHTML = '';
+
+            usernames.forEach(username => {
+                if (username === currentUser.username) return;
+                const chatId = [currentUser.username, username].sort().join('-');
+
+                const el = document.createElement('div');
+                el.className = `px-5 py-4 hover:bg-zinc-800 cursor-pointer flex gap-4 items-center border-b border-zinc-800 ${currentChatId === chatId ? 'bg-zinc-800' : ''}`;
+                el.innerHTML = `
+                    <img src="https://i.pravatar.cc/128?u=${username}" class="w-12 h-12 rounded-2xl">
+                    <div class="flex-1">
+                        <div class="font-medium">${username}</div>
+                        <div class="text-xs text-zinc-500">Онлайн</div>
+                    </div>
+                `;
+                el.onclick = () => openChat(username, chatId);
+                container.appendChild(el);
+            });
+        }
+
+        function openChat(partner, chatId) {
+            currentChatId = chatId;
+            currentChatPartner = partner;
+
+            document.getElementById('chat-header-avatar').innerHTML = `<img src="https://i.pravatar.cc/128?u=${partner}" class="w-full h-full object-cover">`;
+            document.getElementById('chat-header-name').textContent = partner;
+
+            socket.emit('join-chat', partner);
+            setTimeout(() => socket.emit('join-chat', partner), 200);
+        }
+
+        function newChatPrompt() {
+            const username = prompt('Логин собеседника:');
+            if (!username || username === currentUser.username) return;
+            const chatId = [currentUser.username, username].sort().join('-');
+            openChat(username, chatId);
+        }
+
+        function renderMessages(messages, append = false) {
+            const container = document.getElementById('messages');
+            if (!append) container.innerHTML = '';
+
+            const key = chatKeys[currentChatId] || 'defaultkey';
+
+            messages.forEach(msg => {
+                const isMe = msg.from === currentUser.username;
+                const text = decrypt(msg.cipher, key) || '[Ошибка расшифровки]';
+
+                const div = document.createElement('div');
+                div.className = `flex ${isMe ? 'justify-end' : 'justify-start'}`;
+                div.innerHTML = `
+                    <div class="message-bubble ${isMe ? 'me' : 'them'}">
+                        <div class="text-[15px] break-words">${text}</div>
+                        <div class="text-[10px] opacity-70 text-right mt-1">${msg.time}</div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function encrypt(text, key) {
+            return CryptoJS.AES.encrypt(text, key).toString();
+        }
+
+        function decrypt(cipher, key) {
+            try {
+                const bytes = CryptoJS.AES.decrypt(cipher, key);
+                return bytes.toString(CryptoJS.enc.Utf8) || '[Ошибка]';
+            } catch {
+                return '[Ошибка расшифровки]';
+            }
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('message-input');
+            const text = input.value.trim();
+            if (!text || !currentChatId || !currentChatPartner) return;
+
+            const key = chatKeys[currentChatId];
+            if (!key) return alert('Задайте ключ чата (иконка замка)');
+
+            const cipher = encrypt(text, key);
+            const time = new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
+
+            // Локально показываем сразу
+            renderMessages([{ from: currentUser.username, cipher, time }], true);
+
+            socket.emit('send-message', { otherUsername: currentChatPartner, cipher, time });
+
+            input.value = '';
+        }
+
+        function showKeyModal() {
+            if (!currentChatId) return alert('Выберите чат');
+            document.getElementById('key-modal').classList.remove('hidden');
+            document.getElementById('key-input').value = chatKeys[currentChatId] || '';
+        }
+
+        function closeKeyModal() { document.getElementById('key-modal').classList.add('hidden'); }
+
+        function saveKey() {
+            const newKey = document.getElementById('key-input').value.trim();
+            if (newKey.length < 8) return alert('Минимум 8 символов');
+            chatKeys[currentChatId] = newKey;
+            localStorage.setItem('chatKeys', JSON.stringify(chatKeys));
+            closeKeyModal();
+            alert('Ключ сохранён');
+            socket.emit('join-chat', currentChatPartner);
+        }
+
+        function simulateMessage() {
+            if (!currentChatId) return alert('Выберите чат');
+            const texts = ["Привет!", "Как дела?", "Тестируем", "Работает?"];
+            document.getElementById('message-input').value = texts[Math.floor(Math.random() * texts.length)];
+            sendMessage();
+        }
+
+        function toggleMobileSidebar() {}
+
+        window.onload = async () => {
+            const token = localStorage.getItem('token');
+            if (!token) return;
+
+            try {
+                const res = await fetch('/api/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Токен недействителен');
+                const data = await res.json();
+                currentUser = { ...data, token };
+
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('chat-screen').classList.remove('hidden');
+
+                document.getElementById('my-avatar').src = currentUser.avatar;
+                document.getElementById('my-name').textContent = currentUser.username;
+
+                initSocket();
+            } catch (e) {
+                localStorage.removeItem('token');
+            }
+        };
+    </script>
+</body>
+</html>
