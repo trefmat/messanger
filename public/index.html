@@ -47,11 +47,9 @@
                 <img id="my-avatar" src="" class="w-10 h-10 rounded-2xl ring-2 ring-emerald-500">
                 <div class="flex-1">
                     <div id="my-name" class="font-semibold"></div>
-                    <div class="text-emerald-400 text-xs flex items-center gap-1">
-                        <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                        онлайн
-                    </div>
                 </div>
+                <button id="admin-btn" onclick="showUsersModal()" class="text-zinc-400 hover:text-blue-400 hidden" title="Управление пользователями"><i class="fa-solid fa-users"></i></button>
+                <button onclick="showChangePasswordModal()" class="text-zinc-400 hover:text-emerald-400" title="Смена пароля"><i class="fa-solid fa-lock"></i></button>
                 <button onclick="logout()" class="text-zinc-400 hover:text-red-400"><i class="fa-solid fa-right-from-bracket"></i></button>
             </div>
 
@@ -79,7 +77,6 @@
                     <div id="chat-header-avatar" class="w-10 h-10 rounded-2xl overflow-hidden ring-2 ring-emerald-500/30"></div>
                     <div>
                         <div id="chat-header-name" class="font-semibold text-lg">Выберите чат</div>
-                        <div id="chat-header-status" class="text-emerald-400 text-xs">● онлайн</div>
                     </div>
                 </div>
                 <div class="flex gap-6">
@@ -108,6 +105,45 @@
             <div class="mt-8 flex gap-3">
                 <button onclick="closeKeyModal()" class="flex-1 py-4 border border-zinc-700 rounded-2xl hover:bg-zinc-800">Отмена</button>
                 <button onclick="saveKey()" class="flex-1 py-4 bg-emerald-500 hover:bg-emerald-600 rounded-2xl font-medium">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL CHANGE PASSWORD -->
+    <div id="change-password-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50">
+        <div class="bg-zinc-900 rounded-3xl p-8 max-w-sm w-full mx-4">
+            <h3 class="text-2xl font-semibold mb-6 flex items-center gap-3"><i class="fa-solid fa-lock text-emerald-400"></i> Смена пароля</h3>
+            <input id="old-password" type="password" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 text-lg outline-none mb-4" placeholder="Старый пароль">
+            <input id="new-password" type="password" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 text-lg outline-none mb-4" placeholder="Новый пароль">
+            <input id="new-password-confirm" type="password" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 text-lg outline-none mb-8" placeholder="Подтверждение пароля">
+            <div class="flex gap-3">
+                <button onclick="closeChangePasswordModal()" class="flex-1 py-4 border border-zinc-700 rounded-2xl hover:bg-zinc-800">Отмена</button>
+                <button onclick="submitChangePassword()" class="flex-1 py-4 bg-emerald-500 hover:bg-emerald-600 rounded-2xl font-medium">Изменить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL USERS MANAGEMENT -->
+    <div id="users-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50">
+        <div class="bg-zinc-900 rounded-3xl p-8 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <h3 class="text-2xl font-semibold mb-6 flex items-center gap-3"><i class="fa-solid fa-users text-blue-400"></i> Управление пользователями</h3>
+            <div id="users-list" class="space-y-3 mb-8"></div>
+            <div class="flex gap-3">
+                <button onclick="showCreateUserModal()" class="flex-1 py-4 bg-blue-500 hover:bg-blue-600 rounded-2xl font-medium"><i class="fa-solid fa-plus"></i> Новый пользователь</button>
+                <button onclick="closeUsersModal()" class="flex-1 py-4 border border-zinc-700 rounded-2xl hover:bg-zinc-800">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL CREATE USER -->
+    <div id="create-user-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50">
+        <div class="bg-zinc-900 rounded-3xl p-8 max-w-sm w-full mx-4">
+            <h3 class="text-2xl font-semibold mb-6 flex items-center gap-3"><i class="fa-solid fa-user-plus text-blue-400"></i> Создать пользователя</h3>
+            <input id="new-user-login" type="text" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 text-lg outline-none mb-4" placeholder="Логин">
+            <input id="new-user-password" type="password" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 text-lg outline-none mb-8" placeholder="Пароль">
+            <div class="flex gap-3">
+                <button onclick="closeCreateUserModal()" class="flex-1 py-4 border border-zinc-700 rounded-2xl hover:bg-zinc-800">Отмена</button>
+                <button onclick="submitCreateUser()" class="flex-1 py-4 bg-blue-500 hover:bg-blue-600 rounded-2xl font-medium">Создать</button>
             </div>
         </div>
     </div>
@@ -141,6 +177,11 @@
 
                 document.getElementById('my-avatar').src = currentUser.avatar;
                 document.getElementById('my-name').textContent = currentUser.username;
+
+                // Показываем кнопку управления пользователями только для админа
+                if (currentUser.username === 'admin') {
+                    document.getElementById('admin-btn').classList.remove('hidden');
+                }
 
                 initSocket();
             } catch (e) {
@@ -185,7 +226,6 @@
                     <img src="https://i.pravatar.cc/128?u=${username}" class="w-12 h-12 rounded-2xl">
                     <div class="flex-1">
                         <div class="font-medium">${username}</div>
-                        <div class="text-xs text-zinc-500">Онлайн</div>
                     </div>
                 `;
                 el.onclick = () => openChat(username, chatId);
@@ -292,7 +332,140 @@
             sendMessage();
         }
 
+        async function submitChangePassword() {
+            const oldPassword = document.getElementById('old-password').value.trim();
+            const newPassword = document.getElementById('new-password').value.trim();
+            const confirmPassword = document.getElementById('new-password-confirm').value.trim();
+
+            if (!oldPassword || !newPassword) return alert('Заполните все поля');
+            if (newPassword !== confirmPassword) return alert('Пароли не совпадают');
+            if (newPassword.length < 6) return alert('Новый пароль должен быть не менее 6 символов');
+
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch('/api/change-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ oldPassword, newPassword })
+                });
+                const data = await res.json();
+                if (data.error) return alert(data.error);
+
+                alert('Пароль успешно изменён');
+                closeChangePasswordModal();
+            } catch (e) {
+                alert('Ошибка при смене пароля');
+            }
+        }
+
         function toggleMobileSidebar() {}
+
+        async function showUsersModal() {
+            document.getElementById('users-modal').classList.remove('hidden');
+            
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch('/api/users', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const users = await res.json();
+                
+                const container = document.getElementById('users-list');
+                container.innerHTML = '';
+                
+                users.forEach(user => {
+                    const div = document.createElement('div');
+                    div.className = 'bg-zinc-800 p-4 rounded-2xl flex items-center justify-between';
+                    div.innerHTML = `
+                        <div class="flex items-center gap-4">
+                            <img src="${user.avatar}" class="w-10 h-10 rounded-2xl">
+                            <span class="font-medium">${user.username}</span>
+                        </div>
+                        <button onclick="showAdminPasswordModal('${user.username}')" class="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg text-sm font-medium">
+                            Смена пароля
+                        </button>
+                    `;
+                    container.appendChild(div);
+                });
+            } catch (e) {
+                alert('Ошибка при загрузке списка пользователей');
+            }
+        }
+
+        function closeUsersModal() {
+            document.getElementById('users-modal').classList.add('hidden');
+        }
+
+        function showCreateUserModal() {
+            document.getElementById('create-user-modal').classList.remove('hidden');
+            document.getElementById('new-user-login').value = '';
+            document.getElementById('new-user-password').value = '';
+            document.getElementById('new-user-login').focus();
+        }
+
+        function closeCreateUserModal() {
+            document.getElementById('create-user-modal').classList.add('hidden');
+        }
+
+        async function submitCreateUser() {
+            const username = document.getElementById('new-user-login').value.trim();
+            const password = document.getElementById('new-user-password').value.trim();
+
+            if (!username || !password) return alert('Заполните все поля');
+            if (username.length < 3) return alert('Логин должен быть минимум 3 символа');
+            if (password.length < 6) return alert('Пароль должен быть минимум 6 символов');
+
+            try {
+                const res = await fetch('/api/create-user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                if (data.error) return alert(data.error);
+
+                alert(`Пользователь ${username} успешно создан`);
+                closeCreateUserModal();
+                showUsersModal();
+            } catch (e) {
+                alert('Ошибка при создании пользователя');
+            }
+        }
+
+        function showAdminPasswordModal(username) {
+            const newPassword = prompt(`Введите новый пароль для ${username}:`);
+            if (!newPassword) return;
+            if (newPassword.length < 6) return alert('Пароль должен быть минимум 6 символов');
+            
+            changeUserPasswordAsAdmin(username, newPassword);
+        }
+
+        async function changeUserPasswordAsAdmin(username, newPassword) {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch('/api/change-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ targetUsername: username, newPassword })
+                });
+                const data = await res.json();
+                if (data.error) return alert(data.error);
+
+                alert(`Пароль пользователя ${username} успешно изменён`);
+                showUsersModal();
+            } catch (e) {
+                alert('Ошибка при смене пароля');
+            }
+        }
+
+        function toggleMobileSidebar() {}
+
 
         window.onload = async () => {
             const token = localStorage.getItem('token');
@@ -311,6 +484,11 @@
 
                 document.getElementById('my-avatar').src = currentUser.avatar;
                 document.getElementById('my-name').textContent = currentUser.username;
+
+                // Показываем кнопку управления пользователями только для админа
+                if (currentUser.username === 'admin') {
+                    document.getElementById('admin-btn').classList.remove('hidden');
+                }
 
                 initSocket();
             } catch (e) {

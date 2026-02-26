@@ -94,6 +94,84 @@ app.post('/api/create-user', (req, res) => {
   res.json({ success: true, message: `Пользователь ${username} создан` });
 });
 
+app.get('/api/users', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Нет токена' });
+  }
+  
+  const token = authHeader.split(' ')[1];
+  let username;
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    username = payload.username;
+  } catch (err) {
+    return res.status(401).json({ error: 'Недействительный токен' });
+  }
+
+  // Только админ может получить список всех пользователей
+  if (username !== 'admin') {
+    return res.status(403).json({ error: 'Только администратор может просмотреть список пользователей' });
+  }
+
+  const userList = users.map(u => ({
+    username: u.username,
+    avatar: u.avatar
+  }));
+  res.json(userList);
+});
+
+app.post('/api/change-password', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Нет токена' });
+  }
+  
+  const token = authHeader.split(' ')[1];
+  let currentUsername;
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    currentUsername = payload.username;
+  } catch (err) {
+    return res.status(401).json({ error: 'Недействительный токен' });
+  }
+
+  const { targetUsername, oldPassword, newPassword } = req.body;
+  
+  // Определяем целевого пользователя
+  const target = targetUsername || currentUsername;
+  
+  // Если это не админ и пытается менять пароль другому пользователю
+  if (currentUsername !== 'admin' && target !== currentUsername) {
+    return res.status(403).json({ error: 'Вы можете менять только свой пароль' });
+  }
+
+  // Если это не админ, требуется старый пароль
+  if (currentUsername !== 'admin' && !oldPassword) {
+    return res.status(400).json({ error: 'Требуется старый пароль' });
+  }
+
+  if (!newPassword) {
+    return res.status(400).json({ error: 'Требуется новый пароль' });
+  }
+
+  const user = users.find(u => u.username === target);
+  if (!user) {
+    return res.status(404).json({ error: 'Пользователь не найден' });
+  }
+
+  // Если это не админ, проверяем старый пароль
+  if (currentUsername !== 'admin') {
+    if (!bcrypt.compareSync(oldPassword, user.passwordHash)) {
+      return res.status(401).json({ error: 'Старый пароль неверен' });
+    }
+  }
+
+  user.passwordHash = bcrypt.hashSync(newPassword, 10);
+  saveUsers();
+  res.json({ success: true, message: `Пароль пользователя ${target} успешно изменён` });
+});
+
 // ──────────────────────────────────────────────
 // Socket.IO
 // ──────────────────────────────────────────────
