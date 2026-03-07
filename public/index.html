@@ -24,18 +24,10 @@
 
     <!-- ЛОГИН -->
     <div id="login-screen" class="flex items-center justify-center h-full">
-        <div class="bg-zinc-900 rounded-3xl w-full max-w-md p-10 shadow-2xl">
-            <div class="flex justify-center mb-6">
-                <div class="flex items-center gap-3 text-5xl">
-                    <span>🔒</span>
-                    <span class="logo-font font-bold tracking-tighter">CryptoChat</span>
-                </div>
-            </div>
-            <h2 class="text-center text-2xl font-semibold mb-8">Вход в защищённый чат</h2>
+        <div class="w-full max-w-xs p-6">
             <input id="username" type="text" placeholder="Логин" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 mb-4 outline-none focus:border-emerald-500">
-            <input id="password" type="password" placeholder="Пароль" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 mb-8 outline-none focus:border-emerald-500">
+            <input id="password" type="password" placeholder="Пароль" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 mb-6 outline-none focus:border-emerald-500">
             <button onclick="login()" class="w-full bg-emerald-500 hover:bg-emerald-600 py-4 rounded-2xl font-semibold text-lg transition">Войти</button>
-            <p class="text-center text-xs text-zinc-500 mt-10">Только администратор выдаёт логины и пароли</p>
         </div>
     </div>
 
@@ -44,7 +36,6 @@
         <!-- SIDEBAR -->
         <div class="w-full md:w-80 bg-zinc-900 border-r border-zinc-800 flex flex-col">
             <div class="p-5 border-b border-zinc-800 flex items-center gap-3">
-                <img id="my-avatar" src="" class="w-10 h-10 rounded-2xl ring-2 ring-emerald-500">
                 <div class="flex-1">
                     <div id="my-name" class="font-semibold"></div>
                 </div>
@@ -74,13 +65,12 @@
             <div class="h-16 bg-zinc-900 border-b border-zinc-800 px-6 flex items-center justify-between">
                 <div class="flex items-center gap-4">
                     <button onclick="toggleMobileSidebar()" class="md:hidden text-3xl text-zinc-400">☰</button>
-                    <div id="chat-header-avatar" class="w-10 h-10 rounded-2xl overflow-hidden ring-2 ring-emerald-500/30"></div>
+                    <div id="chat-header-avatar" class="w-10 h-10 rounded-2xl overflow-hidden ring-2 ring-emerald-500/30 bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white font-semibold"></div>
                     <div>
                         <div id="chat-header-name" class="font-semibold text-lg">Выберите чат</div>
                     </div>
                 </div>
                 <div class="flex gap-6">
-                    <button onclick="simulateMessage()" class="flex items-center gap-2 text-sm text-zinc-400 hover:text-white"><i class="fa-solid fa-arrow-down"></i> Симулировать</button>
                     <button onclick="showKeyModal()" class="text-zinc-400 hover:text-white"><i class="fa-solid fa-key"></i></button>
                 </div>
             </div>
@@ -155,6 +145,10 @@
         let currentChatPartner = null;
         let chatKeys = JSON.parse(localStorage.getItem('chatKeys') || '{}');
 
+        function getInitialAvatar(username) {
+            return username.charAt(0).toUpperCase();
+        }
+
         async function login() {
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value.trim();
@@ -175,7 +169,6 @@
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('chat-screen').classList.remove('hidden');
 
-                document.getElementById('my-avatar').src = currentUser.avatar;
                 document.getElementById('my-name').textContent = currentUser.username;
 
                 // Показываем кнопку управления пользователями только для админа
@@ -207,8 +200,21 @@
                 // Если это не текущий открытый чат — игнорируем
                 if (msg.chatId !== currentChatId) return;
 
-                // Показываем ВСЕ сообщения в этом чате, включая свои (если вдруг не показали локально)
                 renderMessages([msg], true);
+            });
+
+            socket.on('chat-deleted', (deletedChatId) => {
+                if (deletedChatId === currentChatId) {
+                    currentChatId = null;
+                    currentChatPartner = null;
+                    document.getElementById('messages').innerHTML = '';
+                    document.getElementById('chat-header-name').textContent = 'Выберите чат';
+                }
+                socket.emit('get-chats');
+            });
+
+            socket.on('error', (message) => {
+                alert('Ошибка: ' + message);
             });
         }
 
@@ -221,23 +227,35 @@
                 const chatId = [currentUser.username, username].sort().join('-');
 
                 const el = document.createElement('div');
-                el.className = `px-5 py-4 hover:bg-zinc-800 cursor-pointer flex gap-4 items-center border-b border-zinc-800 ${currentChatId === chatId ? 'bg-zinc-800' : ''}`;
+                el.className = `px-5 py-4 hover:bg-zinc-800 flex gap-4 items-center border-b border-zinc-800 group ${currentChatId === chatId ? 'bg-zinc-800' : ''}`;
                 el.innerHTML = `
-                    <img src="https://i.pravatar.cc/128?u=${username}" class="w-12 h-12 rounded-2xl">
-                    <div class="flex-1">
+                    <div class="flex-1 cursor-pointer">
                         <div class="font-medium">${username}</div>
                     </div>
+                    <button class="delete-chat-btn text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition" title="Удалить чат"><i class="fa-solid fa-trash"></i></button>
                 `;
-                el.onclick = () => openChat(username, chatId);
+                
+                // Обработчик для удаления чата
+                const deleteBtn = el.querySelector('.delete-chat-btn');
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteChat(chatId, username);
+                });
+                
+                el.addEventListener('click', () => openChat(username, chatId));
                 container.appendChild(el);
             });
         }
 
         function openChat(partner, chatId) {
+            if (!partner || partner.trim() === '') {
+                alert('Невалидное имя пользователя');
+                return;
+            }
             currentChatId = chatId;
             currentChatPartner = partner;
 
-            document.getElementById('chat-header-avatar').innerHTML = `<img src="https://i.pravatar.cc/128?u=${partner}" class="w-full h-full object-cover">`;
+            document.getElementById('chat-header-avatar').innerHTML = `<div class="w-full h-full bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white text-lg font-semibold">${partner.charAt(0).toUpperCase()}</div>`;
             document.getElementById('chat-header-name').textContent = partner;
 
             socket.emit('join-chat', partner);
@@ -299,9 +317,6 @@
             const cipher = encrypt(text, key);
             const time = new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
 
-            // Локально показываем сразу
-            renderMessages([{ from: currentUser.username, cipher, time }], true);
-
             socket.emit('send-message', { otherUsername: currentChatPartner, cipher, time });
 
             input.value = '';
@@ -315,6 +330,18 @@
 
         function closeKeyModal() { document.getElementById('key-modal').classList.add('hidden'); }
 
+        function showChangePasswordModal() {
+            document.getElementById('change-password-modal').classList.remove('hidden');
+            document.getElementById('old-password').value = '';
+            document.getElementById('new-password').value = '';
+            document.getElementById('new-password-confirm').value = '';
+            document.getElementById('old-password').focus();
+        }
+
+        function closeChangePasswordModal() {
+            document.getElementById('change-password-modal').classList.add('hidden');
+        }
+
         function saveKey() {
             const newKey = document.getElementById('key-input').value.trim();
             if (newKey.length < 8) return alert('Минимум 8 символов');
@@ -325,11 +352,19 @@
             socket.emit('join-chat', currentChatPartner);
         }
 
-        function simulateMessage() {
-            if (!currentChatId) return alert('Выберите чат');
-            const texts = ["Привет!", "Как дела?", "Тестируем", "Работает?"];
-            document.getElementById('message-input').value = texts[Math.floor(Math.random() * texts.length)];
-            sendMessage();
+        function deleteChat(chatId, username) {
+            if (!confirm(`Удалить чат с ${username}? Сообщения будут удалены.`)) return;
+            
+            socket.emit('delete-chat', chatId);
+            
+            // Удаляем из UI
+            currentChatId = null;
+            currentChatPartner = null;
+            document.getElementById('messages').innerHTML = '';
+            document.getElementById('chat-header-name').textContent = 'Выберите чат';
+            
+            // Обновляем список чатов
+            socket.emit('get-chats');
         }
 
         async function submitChangePassword() {
@@ -381,7 +416,6 @@
                     div.className = 'bg-zinc-800 p-4 rounded-2xl flex items-center justify-between';
                     div.innerHTML = `
                         <div class="flex items-center gap-4">
-                            <img src="${user.avatar}" class="w-10 h-10 rounded-2xl">
                             <span class="font-medium">${user.username}</span>
                         </div>
                         <button onclick="showAdminPasswordModal('${user.username}')" class="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg text-sm font-medium">
@@ -482,7 +516,6 @@
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('chat-screen').classList.remove('hidden');
 
-                document.getElementById('my-avatar').src = currentUser.avatar;
                 document.getElementById('my-name').textContent = currentUser.username;
 
                 // Показываем кнопку управления пользователями только для админа

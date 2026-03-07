@@ -31,7 +31,20 @@ function loadData() {
   try {
     if (fs.existsSync(USERS_FILE)) users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
     if (fs.existsSync(MESSAGES_FILE)) allMessages = JSON.parse(fs.readFileSync(MESSAGES_FILE, 'utf8'));
-  } catch (e) {}
+    
+    // Очищаем невалидные сообщения
+    const beforeClean = allMessages.length;
+    allMessages = allMessages.filter(m => {
+      const parts = m.chatId.split('-');
+      return parts.length === 2 && parts[0] && parts[1]; // Оставляем только валидные chatId
+    });
+    if (beforeClean > allMessages.length) {
+      console.log(`✅ Удалено невалидных сообщений: ${beforeClean - allMessages.length}`);
+      saveMessages();
+    }
+  } catch (e) {
+    console.error('Ошибка при загрузке данных:', e);
+  }
 }
 
 function saveUsers() { fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2)); }
@@ -43,8 +56,7 @@ loadData();
 if (users.length === 0) {
   users.push({
     username: "admin",
-    passwordHash: bcrypt.hashSync("123456", 10),
-    avatar: "https://i.pravatar.cc/128?u=admin"
+    passwordHash: bcrypt.hashSync("123456", 10)
   });
   saveUsers();
   console.log('Создан админ: admin / 123456');
@@ -61,7 +73,7 @@ app.post('/api/login', (req, res) => {
     return res.status(401).json({ error: 'Неверный логин или пароль' });
   }
   const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: '30d' });
-  res.json({ token, username, avatar: user.avatar });
+  res.json({ token, username });
 });
 
 app.get('/api/me', (req, res) => {
@@ -86,8 +98,7 @@ app.post('/api/create-user', (req, res) => {
 
   const newUser = {
     username,
-    passwordHash: bcrypt.hashSync(password, 10),
-    avatar: `https://i.pravatar.cc/128?u=${username}`
+    passwordHash: bcrypt.hashSync(password, 10)
   };
   users.push(newUser);
   saveUsers();
@@ -195,9 +206,15 @@ io.on('connection', (socket) => {
   socket.on('get-chats', () => {
     const chats = new Set();
     allMessages.forEach(m => {
-      const [u1, u2] = m.chatId.split('-');
+      const parts = m.chatId.split('-');
+      if (parts.length !== 2 || !parts[0] || !parts[1]) return; // Пропускаем невалидные chatId
+      const [u1, u2] = parts;
       if (u1 === socket.username || u2 === socket.username) {
-        chats.add(u1 === socket.username ? u2 : u1);
+        const otherUser = u1 === socket.username ? u2 : u1;
+        // Проверяем что пользователь еще существует
+        if (otherUser && users.find(u => u.username === otherUser)) {
+          chats.add(otherUser);
+        }
       }
     });
     socket.emit('your-chats', Array.from(chats));
@@ -205,6 +222,10 @@ io.on('connection', (socket) => {
 
   // Присоединиться к чату
   socket.on('join-chat', (otherUsername) => {
+    // Проверяем что пользователь существует
+    if (!otherUsername || !users.find(u => u.username === otherUsername)) {
+      return socket.emit('error', 'Пользователь не найден');
+    }
     const chatId = [socket.username, otherUsername].sort().join('-');
     socket.join(chatId);
 
@@ -215,6 +236,10 @@ io.on('connection', (socket) => {
 
   // Отправка сообщения
   socket.on('send-message', ({ otherUsername, cipher, time }) => {
+    // Проверяем что пользователь существует
+    if (!otherUsername || !users.find(u => u.username === otherUsername)) {
+      return socket.emit('error', 'Пользователь не найден');
+    }
     const chatId = [socket.username, otherUsername].sort().join('-');
     const msg = {
       id: Date.now() + '',
@@ -227,6 +252,18 @@ io.on('connection', (socket) => {
     saveMessages();
 
     io.to(chatId).emit('new-message', msg);
+  });
+
+  // Удаление чата
+  socket.on('delete-chat', (chatId) => {
+    console.log(`Удаление чата: ${chatId}`);
+    const before = allMessages.length;
+    allMessages = allMessages.filter(m => m.chatId !== chatId);
+    const after = allMessages.length;
+    console.log(`Удалено сообщений: ${before - after}`);
+    saveMessages();
+    
+    io.emit('chat-deleted', chatId);
   });
 
   socket.on('disconnect', () => {
