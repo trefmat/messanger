@@ -7,6 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@latest"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode.js/1.5.3/qrcode.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap');
@@ -91,8 +92,23 @@
     <div id="key-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50">
         <div class="bg-zinc-900 rounded-3xl p-8 max-w-sm w-full mx-4">
             <h3 class="text-2xl font-semibold mb-6 flex items-center gap-3"><i class="fa-solid fa-key text-emerald-400"></i> Секретный ключ чата</h3>
-            <input id="key-input" type="text" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 text-lg outline-none" placeholder="Введите общий ключ (мин. 8 символов)">
+            
+            <!-- QR Код -->
+            <div id="qr-container" class="flex justify-center mb-6 bg-white p-4 rounded-2xl" style="display: none;">
+                <div id="qrcode"></div>
+            </div>
+            
+            <!-- Поле ввода ключа -->
+            <input id="key-input" type="text" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 text-lg outline-none" placeholder="Введите общий ключ (мин. 8 символов)" oninput="generateQRCode(this.value)">
+            
+            <!-- Кнопки -->
             <div class="mt-8 flex gap-3">
+                <button onclick="generateRandomKey()" class="flex-1 py-3 bg-blue-500 hover:bg-blue-600 rounded-2xl font-medium text-sm flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Сгенерировать
+                </button>
+            </div>
+            
+            <div class="mt-4 flex gap-3">
                 <button onclick="closeKeyModal()" class="flex-1 py-4 border border-zinc-700 rounded-2xl hover:bg-zinc-800">Отмена</button>
                 <button onclick="saveKey()" class="flex-1 py-4 bg-emerald-500 hover:bg-emerald-600 rounded-2xl font-medium">Сохранить</button>
             </div>
@@ -188,7 +204,7 @@
         }
 
         function initSocket() {
-            socket = io({ auth: { token: currentUser.token } });
+            socket = io('browsermessage.run.place', { auth: { token: currentUser.token } });
 
             socket.on('connect', () => socket.emit('get-chats'));
 
@@ -324,11 +340,48 @@
 
         function showKeyModal() {
             if (!currentChatId) return alert('Выберите чат');
+            const inputEl = document.getElementById('key-input');
+            inputEl.value = chatKeys[currentChatId] || '';
             document.getElementById('key-modal').classList.remove('hidden');
-            document.getElementById('key-input').value = chatKeys[currentChatId] || '';
+            generateQRCode(inputEl.value);
         }
 
-        function closeKeyModal() { document.getElementById('key-modal').classList.add('hidden'); }
+        function closeKeyModal() { 
+            document.getElementById('key-modal').classList.add('hidden');
+            document.getElementById('qr-container').style.display = 'none';
+            document.getElementById('qrcode').innerHTML = '';
+        }
+
+        function generateRandomKey() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+            let key = '';
+            for (let i = 0; i < 32; i++) {
+                key += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            const inputEl = document.getElementById('key-input');
+            inputEl.value = key;
+            generateQRCode(key);
+        }
+
+        function generateQRCode(text) {
+            if (!text || text.length < 8) {
+                document.getElementById('qr-container').style.display = 'none';
+                document.getElementById('qrcode').innerHTML = '';
+                return;
+            }
+            
+            document.getElementById('qr-container').style.display = 'flex';
+            document.getElementById('qrcode').innerHTML = '';
+            
+            new QRCode(document.getElementById('qrcode'), {
+                text: text,
+                width: 200,
+                height: 200,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        }
 
         function showChangePasswordModal() {
             document.getElementById('change-password-modal').classList.remove('hidden');

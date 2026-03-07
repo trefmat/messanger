@@ -1,4 +1,5 @@
 import express from 'express';
+import https from 'https';
 import http from 'http';
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
@@ -7,11 +8,28 @@ import fs from 'fs';
 import cors from 'cors';
 
 const app = express();
-const server = http.createServer(app);
+
+// Выбираем HTTP или HTTPS в зависимости от переменной окружения
+let server;
+const PORT = process.env.PORT || 443;
+
+if (process.env.NODE_ENV === 'production') {
+  // HTTPS для продакшена
+  const options = {
+    key: fs.readFileSync('/etc/letsencrypt/live/browsermessage.run.place/privkey.pem'),
+    cert: fs.readFileSync('/etc/letsencrypt/live/browsermessage.run.place/fullchain.pem')
+  };
+  server = https.createServer(options, app);
+  console.log('🔒 HTTPS mode');
+} else {
+  // HTTP для разработки (на локальном компе)
+  server = http.createServer(app);
+  console.log('📡 HTTP mode (dev)');
+}
+
 const io = new Server(server, { cors: { origin: "*" } });
 
 const JWT_SECRET = 'crypto-chat-super-secret-2026-change-this-in-production';
-const PORT = 3000;
 
 app.use(cors());
 app.use(express.json());
@@ -272,6 +290,10 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Сервер запущен на http://localhost:${PORT}`);
-  console.log(`Также доступен по http://<ваш-ip>:${PORT} в локальной сети`);
+  if (process.env.NODE_ENV === 'production') {
+    console.log(`🔒 HTTPS сервер запущен на https://browsermessage.run.place`);
+  } else {
+    console.log(`📡 HTTP сервер запущен на http://localhost:${PORT}`);
+    console.log(`Также доступен по http://<ваш-ip>:${PORT} в локальной сети`);
+  }
 });
