@@ -17,39 +17,73 @@ const app = express();
 
 // Выбираем HTTP или HTTPS в зависимости от переменной окружения
 let server;
-const PORT = process.env.PORT || 443;
 const NODE_ENV = process.env.NODE_ENV || 'development';
+const PORT = process.env.PORT || (NODE_ENV === 'production' ? 3000 : 3000); // Production behind nginx proxy
 
 if (NODE_ENV === 'production') {
-  // HTTPS для продакшена
-  const sslKeyPath = process.env.SSL_KEY_PATH || '/etc/letsencrypt/live/browsermessage.run.place/privkey.pem';
-  const sslCertPath = process.env.SSL_CERT_PATH || '/etc/letsencrypt/live/browsermessage.run.place/fullchain.pem';
+  // HTTPS для продакшена (опционально для локального тестирования)
+  const sslKeyPath = process.env.SSL_KEY_PATH;
+  const sslCertPath = process.env.SSL_CERT_PATH;
   
-  if (!fs.existsSync(sslKeyPath) || !fs.existsSync(sslCertPath)) {
-    console.error('❌ SSL сертификаты не найдены! Проверьте SSL_KEY_PATH и SSL_CERT_PATH');
-    process.exit(1);
+  if (sslKeyPath && sslCertPath && fs.existsSync(sslKeyPath) && fs.existsSync(sslCertPath)) {
+    const options = {
+      key: fs.readFileSync(sslKeyPath),
+      cert: fs.readFileSync(sslCertPath)
+    };
+    server = https.createServer(options, app);
+    console.log('🔒 HTTPS mode (production with SSL)');
+  } else {
+    // HTTP режим за nginx reverse proxy (nginx слушает 443 HTTPS)
+    server = http.createServer(app);
+    console.log('📡 HTTP mode (production behind nginx reverse proxy on port ' + PORT + ')');
   }
-  
-  const options = {
-    key: fs.readFileSync(sslKeyPath),
-    cert: fs.readFileSync(sslCertPath)
-  };
-  server = https.createServer(options, app);
-  console.log('🔒 HTTPS mode');
 } else {
-  // HTTP для разработки
+  // HTTP для разработки на локальном хосте
   server = http.createServer(app);
-  console.log('📡 HTTP mode (dev)');
+  console.log('📡 HTTP mode (development) - http://localhost:' + PORT);
 }
 
 // CORS конфигурация
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || `http://localhost:${PORT}`).split(',').map(o => o.trim());
+const protocol = NODE_ENV === 'production' ? 'https' : 'http';
+const baseOrigins = [
+  `${protocol}://localhost:${PORT}`,
+  `${protocol}://localhost:3000`,
+  `${protocol}://127.0.0.1:${PORT}`,
+  `${protocol}://127.0.0.1:3000`
+];
+
+// Парсируем дополнительные origin'ы из .env (список через запятую)
+const envOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
+  : [];
+
+const allowedOrigins = [...new Set([...baseOrigins, ...envOrigins])]; // Убираем дубликаты
+
+console.log('✅ CORS Allowed origins:', allowedOrigins);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Разрешаем запросы без origin (локальные приложения, мобильные приложения)
+    if (!origin) return callback(null, true);
+    
+    // Проверяем если origin в списке разрешённых
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    console.warn('⚠️  CORS: отклонен origin:', origin);
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
 const io = new Server(server, { 
-  cors: { 
-    origin: allowedOrigins,
-    methods: ['GET', 'POST'],
-    credentials: true
-  } 
+  cors: corsOptions,
+  transports: ['websocket', 'polling'],
+  pingInterval: 25000,
+  pingTimeout: 60000
 });
 
 const JWT_SECRET = process.env.JWT_SECRET || (() => {
@@ -57,8 +91,35 @@ const JWT_SECRET = process.env.JWT_SECRET || (() => {
   process.exit(1);
 })();
 
-app.use(helmet()); // Security headers
-app.use(cors({ origin: allowedOrigins, credentials: true }));
+// 🔐 Helmet with CSP для CDN и inline скриптов
+const cspConfig = {
+  directives: {
+    defaultSrc: ["'self'"],
+    scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+    scriptSrcAttr: ["'unsafe-inline'"],
+    styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com"],
+    imgSrc: ["'self'", "data:", "https:"],
+    connectSrc: ["'self'", "wss:", "ws:", "https:", "http:"],
+    fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
+    frameSrc: ["'none'"],
+    objectSrc: ["'none'"]
+  }
+};
+
+// 🔐 Helmet конфигурация с правильными заголовками безопасности
+const helmetConfig = {
+  contentSecurityPolicy: { directives: cspConfig.directives },
+  crossOriginOpenerPolicy: NODE_ENV === 'production' ? { policy: 'same-origin-allow-popups' } : false,
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  originAgentCluster: false, // Избегаем конфликтов с origin-keyed agent cluster
+  hsts: NODE_ENV === 'production' ? { maxAge: 31536000, includeSubDomains: true } : false,
+  frameguard: { action: 'deny' },
+  xssFilter: true,
+  noSniff: true
+};
+
+app.use(helmet(helmetConfig));
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' })); // Limit payload size
 app.use(express.static('public'));
 
@@ -388,7 +449,7 @@ if (NODE_ENV === 'production') {
 
 server.listen(PORT, '0.0.0.0', () => {
   if (NODE_ENV === 'production') {
-    console.log(`🔒 HTTPS сервер запущен на https://browsermessage.run.place`);
+    console.log(`🔒 HTTPS сервер запущен на порту ${PORT}`);
   } else {
     console.log(`📡 HTTP сервер запущен на http://localhost:${PORT}`);
     console.log(`Также доступен по http://<ваш-ip>:${PORT} в локальной сети`);
