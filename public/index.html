@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CryptoChat • E2EE</title>
+    <title>Chat • E2EE</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@latest"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"></script>
@@ -159,7 +159,35 @@
         let currentUser = null;
         let currentChatId = null;
         let currentChatPartner = null;
-        let chatKeys = JSON.parse(localStorage.getItem('chatKeys') || '{}');
+        let chatKeys = {}; // Будет заполнено при загрузке
+
+        // 🔐 Функции для безопасного хранения ключей
+        function encryptChatKeys(keys, token) {
+            return CryptoJS.AES.encrypt(JSON.stringify(keys), token).toString();
+        }
+
+        function decryptChatKeys(encrypted, token) {
+            try {
+                const bytes = CryptoJS.AES.decrypt(encrypted, token);
+                return JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
+            } catch (e) {
+                console.warn('Ошибка при расшифровке ключей:', e);
+                return {};
+            }
+        }
+
+        function saveChatKeys(keys) {
+            if (!currentUser || !currentUser.token) return;
+            const encrypted = encryptChatKeys(keys, currentUser.token);
+            localStorage.setItem('encryptedChatKeys', encrypted);
+        }
+
+        function loadChatKeys() {
+            if (!currentUser || !currentUser.token) return {};
+            const encrypted = localStorage.getItem('encryptedChatKeys');
+            if (!encrypted) return {};
+            return decryptChatKeys(encrypted, currentUser.token);
+        }
 
         function getInitialAvatar(username) {
             return username.charAt(0).toUpperCase();
@@ -181,6 +209,9 @@
 
                 currentUser = data;
                 localStorage.setItem('token', data.token);
+                
+                // Загружаем расшифрованные ключи
+                chatKeys = loadChatKeys();
 
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('chat-screen').classList.remove('hidden');
@@ -200,11 +231,13 @@
 
         function logout() {
             localStorage.removeItem('token');
+            localStorage.removeItem('encryptedChatKeys'); // 🔐 Очищаем зашифрованные ключи
             location.reload();
         }
 
         function initSocket() {
-            socket = io('browsermessage.run.place', { auth: { token: currentUser.token } });
+            // 🔐 Используем текущий домен вместо хардкода
+            socket = io(window.location.origin, { auth: { token: currentUser.token } });
 
             socket.on('connect', () => socket.emit('get-chats'));
 
@@ -297,12 +330,21 @@
 
                 const div = document.createElement('div');
                 div.className = `flex ${isMe ? 'justify-end' : 'justify-start'}`;
-                div.innerHTML = `
-                    <div class="message-bubble ${isMe ? 'me' : 'them'}">
-                        <div class="text-[15px] break-words">${text}</div>
-                        <div class="text-[10px] opacity-70 text-right mt-1">${msg.time}</div>
-                    </div>
-                `;
+                
+                const messageBubble = document.createElement('div');
+                messageBubble.className = `message-bubble ${isMe ? 'me' : 'them'}`;
+                
+                const textDiv = document.createElement('div');
+                textDiv.className = 'text-[15px] break-words';
+                textDiv.textContent = text; // 🔐 Используем textContent вместо innerHTML для защиты от XSS
+                
+                const timeDiv = document.createElement('div');
+                timeDiv.className = 'text-[10px] opacity-70 text-right mt-1';
+                timeDiv.textContent = msg.time;
+                
+                messageBubble.appendChild(textDiv);
+                messageBubble.appendChild(timeDiv);
+                div.appendChild(messageBubble);
                 container.appendChild(div);
             });
 
@@ -399,16 +441,17 @@
             const newKey = document.getElementById('key-input').value.trim();
             if (newKey.length < 8) return alert('Минимум 8 символов');
             chatKeys[currentChatId] = newKey;
-            localStorage.setItem('chatKeys', JSON.stringify(chatKeys));
+            saveChatKeys(chatKeys); // 🔐 Сохраняем в зашифрованном виде
             closeKeyModal();
-            alert('Ключ сохранён');
+            alert('Ключ сохранён (зашифрован и защищен)');
             socket.emit('join-chat', currentChatPartner);
         }
 
         function deleteChat(chatId, username) {
             if (!confirm(`Удалить чат с ${username}? Сообщения будут удалены.`)) return;
             
-            socket.emit('delete-chat', chatId);
+            // 🔐 Отправляем username вместо chatId для безопасности
+            socket.emit('delete-chat', username);
             
             // Удаляем из UI
             currentChatId = null;
@@ -427,7 +470,12 @@
 
             if (!oldPassword || !newPassword) return alert('Заполните все поля');
             if (newPassword !== confirmPassword) return alert('Пароли не совпадают');
-            if (newPassword.length < 6) return alert('Новый пароль должен быть не менее 6 символов');
+            
+            // 🔐 Проверка требований пароля на фронтенде
+            if (newPassword.length < 12) return alert('Пароль должен быть минимум 12 символов');
+            if (!/[A-Z]/.test(newPassword)) return alert('Пароль должен содержать заглавные буквы');
+            if (!/[a-z]/.test(newPassword)) return alert('Пароль должен содержать строчные буквы');
+            if (!/\d/.test(newPassword)) return alert('Пароль должен содержать цифры');
 
             try {
                 const token = localStorage.getItem('token');
@@ -502,8 +550,18 @@
             const password = document.getElementById('new-user-password').value.trim();
 
             if (!username || !password) return alert('Заполните все поля');
-            if (username.length < 3) return alert('Логин должен быть минимум 3 символа');
-            if (password.length < 6) return alert('Пароль должен быть минимум 6 символов');
+            
+            // 🔐 Валидация username
+            const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+            if (!usernameRegex.test(username)) {
+                return alert('Логин: 3-20 символов (буквы, цифры, подчеркивание)');
+            }
+            
+            // 🔐 Валидация пароля
+            if (password.length < 12) return alert('Пароль должен быть минимум 12 символов');
+            if (!/[A-Z]/.test(password)) return alert('Пароль должен содержать заглавные буквы');
+            if (!/[a-z]/.test(password)) return alert('Пароль должен содержать строчные буквы');
+            if (!/\d/.test(password)) return alert('Пароль должен содержать цифры');
 
             try {
                 const res = await fetch('/api/create-user', {
@@ -525,7 +583,12 @@
         function showAdminPasswordModal(username) {
             const newPassword = prompt(`Введите новый пароль для ${username}:`);
             if (!newPassword) return;
-            if (newPassword.length < 6) return alert('Пароль должен быть минимум 6 символов');
+            
+            // 🔐 Валидация пароля
+            if (newPassword.length < 12) return alert('Пароль должен быть минимум 12 символов');
+            if (!/[A-Z]/.test(newPassword)) return alert('Пароль должен содержать заглавные буквы');
+            if (!/[a-z]/.test(newPassword)) return alert('Пароль должен содержать строчные буквы');
+            if (!/\d/.test(newPassword)) return alert('Пароль должен содержать цифры');
             
             changeUserPasswordAsAdmin(username, newPassword);
         }
@@ -566,6 +629,9 @@
                 const data = await res.json();
                 currentUser = { ...data, token };
 
+                // 🔐 Загружаем расшифрованные ключи
+                chatKeys = loadChatKeys();
+
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('chat-screen').classList.remove('hidden');
 
@@ -579,6 +645,7 @@
                 initSocket();
             } catch (e) {
                 localStorage.removeItem('token');
+                localStorage.removeItem('encryptedChatKeys'); // 🔐 Очищаем при ошибке
             }
         };
     </script>

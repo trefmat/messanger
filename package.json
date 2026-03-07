@@ -1,5 +1,5 @@
 {
-  "name": "cryptochat-server",
+  "name": "chat-server",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
@@ -11,6 +11,9 @@
     "socket.io": "^4.8.1",
     "jsonwebtoken": "^9.0.2",
     "bcryptjs": "^3.0.1",
-    "cors": "^2.8.5"
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "express-rate-limit": "^7.1.5",
+    "dotenv": "^16.3.1"
   }
 }

@@ -1,2 +1,8 @@
 /node_modules/
 /messages.json
+.env
+.env.local
+.env.*.local
+package-lock.json
+FIXED_APPLIED.md
+SECURITY_REPORT.md

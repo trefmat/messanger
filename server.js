@@ -6,33 +6,60 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 const app = express();
 
 // Выбираем HTTP или HTTPS в зависимости от переменной окружения
 let server;
 const PORT = process.env.PORT || 443;
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
-if (process.env.NODE_ENV === 'production') {
+if (NODE_ENV === 'production') {
   // HTTPS для продакшена
+  const sslKeyPath = process.env.SSL_KEY_PATH || '/etc/letsencrypt/live/browsermessage.run.place/privkey.pem';
+  const sslCertPath = process.env.SSL_CERT_PATH || '/etc/letsencrypt/live/browsermessage.run.place/fullchain.pem';
+  
+  if (!fs.existsSync(sslKeyPath) || !fs.existsSync(sslCertPath)) {
+    console.error('❌ SSL сертификаты не найдены! Проверьте SSL_KEY_PATH и SSL_CERT_PATH');
+    process.exit(1);
+  }
+  
   const options = {
-    key: fs.readFileSync('/etc/letsencrypt/live/browsermessage.run.place/privkey.pem'),
-    cert: fs.readFileSync('/etc/letsencrypt/live/browsermessage.run.place/fullchain.pem')
+    key: fs.readFileSync(sslKeyPath),
+    cert: fs.readFileSync(sslCertPath)
   };
   server = https.createServer(options, app);
   console.log('🔒 HTTPS mode');
 } else {
-  // HTTP для разработки (на локальном компе)
+  // HTTP для разработки
   server = http.createServer(app);
   console.log('📡 HTTP mode (dev)');
 }
 
-const io = new Server(server, { cors: { origin: "*" } });
+// CORS конфигурация
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || `http://localhost:${PORT}`).split(',').map(o => o.trim());
+const io = new Server(server, { 
+  cors: { 
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true
+  } 
+});
 
-const JWT_SECRET = 'crypto-chat-super-secret-2026-change-this-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  console.error('❌ ERROR: JWT_SECRET не установлена в .env файле!');
+  process.exit(1);
+})();
 
-app.use(cors());
-app.use(express.json());
+app.use(helmet()); // Security headers
+app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.use(express.json({ limit: '1mb' })); // Limit payload size
 app.use(express.static('public'));
 
 // ──────────────────────────────────────────────
@@ -68,6 +95,21 @@ function loadData() {
 function saveUsers() { fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2)); }
 function saveMessages() { fs.writeFileSync(MESSAGES_FILE, JSON.stringify(allMessages, null, 2)); }
 
+// 🔐 Валидация username
+function validateUsername(username) {
+  const regex = /^[a-zA-Z0-9_]{3,20}$/;
+  return regex.test(username);
+}
+
+// 🔐 Валидация пароля
+function validatePassword(password) {
+  if (password.length < 12) return { valid: false, error: 'Пароль должен быть минимум 12 символов' };
+  if (!/[A-Z]/.test(password)) return { valid: false, error: 'Пароль должен содержать заглавные буквы' };
+  if (!/[a-z]/.test(password)) return { valid: false, error: 'Пароль должен содержать строчные буквы' };
+  if (!/\d/.test(password)) return { valid: false, error: 'Пароль должен содержать цифры' };
+  return { valid: true };
+}
+
 loadData();
 
 // Создаём админа, если его нет
@@ -84,8 +126,22 @@ if (users.length === 0) {
 // API
 // ──────────────────────────────────────────────
 
-app.post('/api/login', (req, res) => {
+// 🔐 Rate limiting для login
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 минут
+  max: 5, // максимум 5 попыток
+  message: 'Слишком много попыток входа, попробуйте позже',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.post('/api/login', loginLimiter, (req, res) => {
   const { username, password } = req.body;
+  
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Введите логин и пароль' });
+  }
+  
   const user = users.find(u => u.username === username);
   if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
     return res.status(401).json({ error: 'Неверный логин или пароль' });
@@ -112,7 +168,21 @@ app.get('/api/me', (req, res) => {
 
 app.post('/api/create-user', (req, res) => {
   const { username, password } = req.body;
-  if (users.find(u => u.username === username)) return res.status(400).json({ error: 'Пользователь уже существует' });
+  
+  // 🔐 Валидация username
+  if (!validateUsername(username)) {
+    return res.status(400).json({ error: 'Логин: 3-20 символов (буквы, цифры, подчеркивание)' });
+  }
+  
+  // 🔐 Валидация пароля
+  const passwordCheck = validatePassword(password);
+  if (!passwordCheck.valid) {
+    return res.status(400).json({ error: passwordCheck.error });
+  }
+  
+  if (users.find(u => u.username === username)) {
+    return res.status(400).json({ error: 'Пользователь уже существует' });
+  }
 
   const newUser = {
     username,
@@ -166,6 +236,12 @@ app.post('/api/change-password', (req, res) => {
   }
 
   const { targetUsername, oldPassword, newPassword } = req.body;
+  
+  // 🔐 Валидация нового пароля
+  const passwordCheck = validatePassword(newPassword);
+  if (!passwordCheck.valid) {
+    return res.status(400).json({ error: passwordCheck.error });
+  }
   
   // Определяем целевого пользователя
   const target = targetUsername || currentUsername;
@@ -264,7 +340,8 @@ io.on('connection', (socket) => {
       chatId,
       from: socket.username,
       cipher,
-      time
+      time,
+      timestamp: Date.now() // 🔐 Добавляем временную метку для валидации
     };
     allMessages.push(msg);
     saveMessages();
@@ -272,16 +349,25 @@ io.on('connection', (socket) => {
     io.to(chatId).emit('new-message', msg);
   });
 
-  // Удаление чата
-  socket.on('delete-chat', (chatId) => {
-    console.log(`Удаление чата: ${chatId}`);
+  // Удаление чата - 🔐 только участники могут удалить
+  socket.on('delete-chat', (otherUsername) => {
+    // Проверяем что пользователь существует
+    if (!otherUsername || !users.find(u => u.username === otherUsername)) {
+      return socket.emit('error', 'Пользователь не найден');
+    }
+    
+    // Генерируем правильный chatId
+    const chatId = [socket.username, otherUsername].sort().join('-');
+    console.log(`Удаление чата: ${chatId} инициирован ${socket.username}`);
+    
     const before = allMessages.length;
     allMessages = allMessages.filter(m => m.chatId !== chatId);
     const after = allMessages.length;
     console.log(`Удалено сообщений: ${before - after}`);
     saveMessages();
     
-    io.emit('chat-deleted', chatId);
+    // 🔐 Отправляем только участникам чата
+    io.to(chatId).emit('chat-deleted', chatId);
   });
 
   socket.on('disconnect', () => {
@@ -289,8 +375,19 @@ io.on('connection', (socket) => {
   });
 });
 
+// 🔐 HTTPS редирект в production
+if (NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    if (req.header('x-forwarded-proto') !== 'https') {
+      res.redirect(`https://${req.header('host')}${req.url}`);
+    } else {
+      next();
+    }
+  });
+}
+
 server.listen(PORT, '0.0.0.0', () => {
-  if (process.env.NODE_ENV === 'production') {
+  if (NODE_ENV === 'production') {
     console.log(`🔒 HTTPS сервер запущен на https://browsermessage.run.place`);
   } else {
     console.log(`📡 HTTP сервер запущен на http://localhost:${PORT}`);
