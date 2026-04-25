@@ -1,32 +1,36 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat • E2EE</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode.js/1.5.3/qrcode.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <link rel="icon" href="data:,">
+
+    <!-- Локальный Font Awesome -->
+    <link rel="stylesheet" href="/styles/all.min.css">
+
+    <!-- Локальные скрипты -->
+    <script src="/scripts/crypto-js.min.js"></script>
+    <script src="/scripts/qrcode.min.js"></script>
+    <script src="/scripts/socket.io.min.js"></script>
+
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap');
-        
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body { width: 100%; height: 100%; }
         body {
-            font-family: 'Inter', system-ui, sans-serif;
+            font-family: "Segoe UI", "Noto Sans", "Arial", sans-serif;
             background-color: #09090b;
             color: #e4e4e7;
             overflow: hidden;
         }
-        
+
         input, button, textarea { font-family: inherit; color: #e4e4e7; }
         input:focus, textarea:focus { outline: none; }
-        
-        /* Layout */
+
         .flex { display: flex; }
         .flex-col { flex-direction: column; }
         .flex-row { flex-direction: row; }
+        .hidden { display: none !important; }
         .items-center { align-items: center; }
         .justify-center { justify-content: center; }
         .justify-between { justify-content: space-between; }
@@ -36,33 +40,128 @@
         .gap-3 { gap: 12px; }
         .gap-4 { gap: 16px; }
         .gap-6 { gap: 24px; }
-        
+
         .h-full { height: 100%; }
+        .h-screen { height: 100vh; }
+        .h-10 { height: 40px; }
+        .h-14 { height: 56px; }
+        .h-16 { height: 64px; }
         .w-full { width: 100%; }
+        .w-10 { width: 40px; }
+        .w-14 { width: 56px; }
         .flex-1 { flex: 1; }
-        .md\:flex-row { flex-direction: row; }
-        .md\:w-80 { width: 320px; }
-        .md\:hidden { display: none; }
-        
-        /* Spacing */
+        .max-w-md { max-width: 448px; }
+        .max-w-3xl { max-width: 768px; }
+        .mx-auto { margin-left: auto; margin-right: auto; }
+        .mb-8 { margin-bottom: 32px; }
+        .pl-12 { padding-left: 48px; }
+        .px-6 { padding-left: 24px; padding-right: 24px; }
+        .text-3xl { font-size: 30px; line-height: 1.2; }
+        .text-zinc-100 { color: #f4f4f5; }
+        .text-zinc-500 { color: #71717a; }
+        .text-emerald-400 { color: #34d399; }
+        .text-blue-400 { color: #60a5fa; }
+        .text-red-400 { color: #f87171; }
+        .font-semibold { font-weight: 600; }
+        .font-bold { font-weight: 700; }
+        .font-medium { font-weight: 500; }
+        .overflow-hidden { overflow: hidden; }
+        .overflow-y-auto { overflow-y: auto; }
+        .fixed { position: fixed; }
+        .inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
+        .z-50 { z-index: 50; }
+        .bg-black\/90 { background: rgba(0,0,0,0.9); }
+        .border-t { border-top: 1px solid #27272a; }
+        .border-b { border-bottom: 1px solid #27272a; }
+        .border-r { border-right: 1px solid #27272a; }
+        .relative { position: relative; }
+        .absolute { position: absolute; }
+        .left-5 { left: 20px; }
+        .top-3\.5 { top: 14px; }
+        .space-y-6 > * + * { margin-top: 24px; }
+        .space-y-3 > * + * { margin-top: 12px; }
+        .ring-2 { box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2); }
+        .max-w-sm { max-width: 384px; }
+        .max-w-2xl { max-width: 672px; }
+        .mx-4 { margin-left: 16px; margin-right: 16px; }
+        .max-h-\[80vh\] { max-height: 80vh; }
+        .text-sm { font-size: 14px; }
+        .text-10px { font-size: 10px; }
+        .text-15px { font-size: 15px; }
+        .mt-1 { margin-top: 4px; }
+        .opacity-0 { opacity: 0; }
+        .group:hover .group-hover\:opacity-100 { opacity: 1; }
+        .cursor-pointer { cursor: pointer; }
+
+        .md\:flex-row { flex-direction: column; }
+        .md\:w-80 { width: 100%; }
+        .md\:hidden { display: inline-flex; }
+
+        @media (min-width: 768px) {
+            .md\:flex-row { flex-direction: row; }
+            .md\:w-80 { width: 320px; min-width: 320px; }
+            .md\:hidden { display: none !important; }
+        }
+
+        @media (max-width: 767px) {
+            #chat-screen {
+                position: relative;
+                overflow: hidden;
+            }
+            #chat-sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                width: min(86vw, 320px);
+                z-index: 40;
+                transform: translateX(-105%);
+                transition: transform .24s ease;
+                box-shadow: 20px 0 40px rgba(0, 0, 0, 0.45);
+            }
+            #chat-screen.sidebar-open #chat-sidebar {
+                transform: translateX(0);
+            }
+            #mobile-overlay {
+                position: fixed;
+                inset: 0;
+                z-index: 35;
+                background: rgba(0, 0, 0, 0.45);
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity .24s ease;
+            }
+            #chat-screen.sidebar-open #mobile-overlay {
+                opacity: 1;
+                pointer-events: auto;
+            }
+            #chat-main {
+                width: 100%;
+                min-width: 0;
+            }
+            #messages {
+                padding: 14px;
+            }
+            .message-bubble {
+                max-width: 88%;
+                border-radius: 20px;
+            }
+        }
+
         .p-4 { padding: 16px; }
         .p-5 { padding: 20px; }
         .p-6 { padding: 24px; }
         .p-8 { padding: 32px; }
         .px-4 { padding-left: 16px; padding-right: 16px; }
         .px-5 { padding-left: 20px; padding-right: 20px; }
-        .px-6 { padding-left: 24px; padding-right: 24px; }
         .py-3 { padding-top: 12px; padding-bottom: 12px; }
+        .py-2 { padding-top: 8px; padding-bottom: 8px; }
         .py-4 { padding-top: 16px; padding-bottom: 16px; }
-        .pb-3 { padding-bottom: 12px; }
         .mb-4 { margin-bottom: 16px; }
         .mb-6 { margin-bottom: 24px; }
-        .mb-8 { margin-bottom: 32px; }
-        .mt-1 { margin-top: 4px; }
         .mt-4 { margin-top: 16px; }
         .mt-8 { margin-top: 32px; }
-        
-        /* Colors */
+
         .bg-zinc-800 { background-color: #27272a; }
         .bg-zinc-900 { background-color: #18181b; }
         .bg-zinc-950 { background-color: #09090b; }
@@ -76,147 +175,396 @@
         .text-lg { font-size: 18px; }
         .text-xl { font-size: 20px; }
         .text-2xl { font-size: 24px; }
-        .text-15px { font-size: 15px; }
-        .text-10px { font-size: 10px; }
         .text-zinc-400 { color: #a1a1a6; }
-        .text-zinc-500 { color: #71717a; }
-        .text-emerald-400 { color: #34d399; }
-        .text-blue-400 { color: #60a5fa; }
-        .text-red-400 { color: #f87171; }
         .text-center { text-align: center; }
-        
-        /* Border */
+
         .border { border: 1px solid; }
         .border-zinc-700 { border-color: #3f3f46; }
         .border-zinc-800 { border-color: #27272a; }
-        .border-b { border-bottom: 1px solid; }
-        .border-r { border-right: 1px solid; }
-        .border-t { border-top: 1px solid; }
         .rounded-2xl { border-radius: 16px; }
         .rounded-3xl { border-radius: 24px; }
         .rounded-lg { border-radius: 8px; }
         .rounded-xl { border-radius: 12px; }
-        
-        /* Effects */
+
         .opacity-70 { opacity: 0.7; }
-        .opacity-0 { opacity: 0; }
         .hover\:opacity-100:hover { opacity: 1; }
-        .group:hover .group-hover\:opacity-100 { opacity: 1; }
         .transition { transition: all 0.2s; }
-        .ring-2 { box-shadow: 0 0 0 2px; }
-        .ring-emerald-500\/30 { box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3); }
         .shadow-xl { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
-        
-        /* Hover */
+
         .hover\:bg-zinc-700:hover { background-color: #3f3f46; }
         .hover\:bg-zinc-800:hover { background-color: #27272a; }
         .hover\:bg-emerald-600:hover { background-color: #059669; }
         .hover\:bg-blue-600:hover { background-color: #2563eb; }
         .hover\:text-white:hover { color: white; }
-        .hover\:text-red-400:hover { color: #f87171; }
-        .hover\:text-emerald-400:hover { color: #34d399; }
         .hover\:text-blue-400:hover { color: #60a5fa; }
-        
-        /* Focus */
-        .focus\:border-emerald-500:focus { border-color: #10b981; }
-        
-        /* Font */
-        .font-semibold { font-weight: 600; }
-        .font-medium { font-weight: 500; }
-        .break-words { word-break: break-word; }
-        
-        /* Max width */
-        .max-w-xs { max-width: 320px; }
-        .max-w-sm { max-width: 384px; }
-        .max-w-2xl { max-width: 672px; }
-        .max-w-3xl { max-width: 768px; }
-        
-        /* Overflow */
-        .overflow-hidden { overflow: hidden; }
-        .overflow-x-auto { overflow-x: auto; }
-        .overflow-y-auto { overflow-y: auto; }
-        .overflow-y-scroll { overflow-y: scroll; }
-        .space-y-6 > * + * { margin-top: 24px; }
-        .space-y-3 > * + * { margin-top: 12px; }
-        
-        /* Display */
-        .hidden { display: none !important; }
-        .block { display: block; }
-        .inline-block { display: inline-block; }
-        .inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
-        .fixed { position: fixed; }
-        .absolute { position: absolute; }
-        .relative { position: relative; }
-        .z-50 { z-index: 50; }
-        
-        /* Custom */
-        .logo-font { font-family: 'Space Grotesk', sans-serif; }
+        .hover\:text-emerald-400:hover { color: #34d399; }
+        .hover\:text-red-400:hover { color: #f87171; }
         .chat-bg {
-            background: linear-gradient(135deg, #0a0e27 0%, #1a1a3e 20%, #0f1729 40%, #1a2a3a 60%, #0f1729 80%, #0a0e27 100%);
-            background-size: 300% 300%;
-            animation: float 20s ease infinite;
-            position: relative;
-            overflow: hidden;
+            background-attachment: local;
+            transition: background 0.25s ease;
         }
-        .chat-bg::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: 
-                radial-gradient(circle at 20% 50%, rgba(16, 185, 129, 0.15) 0%, transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 40% 20%, rgba(168, 85, 247, 0.08) 0%, transparent 50%);
-            animation: float-slow 30s ease-in-out infinite;
-            pointer-events: none;
-            z-index: 0;
+        .chat-bg.theme-aurora,
+        .background-swatch.theme-aurora {
+            background:
+                radial-gradient(circle at 14% 20%, rgba(16, 185, 129, 0.18), transparent 42%),
+                radial-gradient(circle at 84% 75%, rgba(34, 197, 94, 0.16), transparent 44%),
+                linear-gradient(180deg, #0a0a0d 0%, #050506 100%);
         }
-        .chat-bg > * {
-            position: relative;
-            z-index: 1;
+        .chat-bg.theme-forest,
+        .background-swatch.theme-forest {
+            background:
+                radial-gradient(circle at 20% 18%, rgba(5, 150, 105, 0.22), transparent 40%),
+                radial-gradient(circle at 72% 82%, rgba(22, 163, 74, 0.18), transparent 44%),
+                linear-gradient(180deg, #0a1511 0%, #050907 100%);
         }
-        @keyframes float {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
+        .chat-bg.theme-lagoon,
+        .background-swatch.theme-lagoon {
+            background:
+                radial-gradient(circle at 16% 16%, rgba(16, 185, 129, 0.16), transparent 40%),
+                radial-gradient(circle at 84% 28%, rgba(6, 182, 212, 0.22), transparent 42%),
+                linear-gradient(180deg, #08131a 0%, #03070d 100%);
         }
-        @keyframes float-slow {
-            0% { transform: translate(0, 0); }
-            33% { transform: translate(30px, -30px); }
-            66% { transform: translate(-20px, 30px); }
-            100% { transform: translate(0, 0); }
+        .chat-bg.theme-sunset,
+        .background-swatch.theme-sunset {
+            background:
+                radial-gradient(circle at 18% 78%, rgba(251, 146, 60, 0.2), transparent 44%),
+                radial-gradient(circle at 82% 14%, rgba(236, 72, 153, 0.16), transparent 40%),
+                linear-gradient(180deg, #1a0f16 0%, #09070d 100%);
+        }
+        .chat-bg.theme-dunes,
+        .background-swatch.theme-dunes {
+            background:
+                radial-gradient(circle at 24% 18%, rgba(245, 158, 11, 0.16), transparent 40%),
+                radial-gradient(circle at 76% 80%, rgba(163, 230, 53, 0.14), transparent 44%),
+                linear-gradient(180deg, #17130a 0%, #090803 100%);
         }
         .message-bubble {
-            max-width: 70%;
-            padding: 14px 18px;
+            max-width: min(78%, 560px);
+            padding: 12px 16px;
             border-radius: 22px;
-            position: relative;
+            border: 1px solid #3f3f46;
+            backdrop-filter: blur(2px);
         }
         .message-bubble.me {
-            background: #10b981;
-            color: white;
-            border-bottom-right-radius: 4px;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.28), rgba(5, 150, 105, 0.22));
+            border-color: rgba(16, 185, 129, 0.45);
         }
         .message-bubble.them {
+            background: rgba(39, 39, 42, 0.92);
+            border-color: rgba(82, 82, 91, 0.8);
+        }
+        .break-words {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+        .fa-solid, .fa-regular, .fa-brands {
+            color: #34d399;
+        }
+
+        /* Улучшенные стили кнопок */
+        button {
+            appearance: none;
+            -webkit-appearance: none;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border: 0;
+            background: transparent;
+            padding: 0;
+        }
+
+        .icon-btn {
+            width: 34px;
+            height: 34px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
             background: #27272a;
+            border: 1px solid #3f3f46;
+            font-size: 16px;
+            line-height: 1;
+        }
+        .icon-btn:hover {
+            background: #3f3f46;
+        }
+
+        #search {
+            padding-left: 46px;
+            font-size: 20px;
+            line-height: 1.2;
+        }
+        #search::placeholder {
+            color: #8b8b95;
+            font-size: 20px;
+        }
+        #search + .fa-magnifying-glass {
+            pointer-events: none;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .send-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #10b981, #0ea5a6);
+            border: 1px solid rgba(16, 185, 129, 0.6);
+            box-shadow: 0 12px 24px rgba(16, 185, 129, 0.35), inset 0 1px 0 rgba(255,255,255,0.16);
+            color: #fff;
+        }
+        .send-btn:hover {
+            transform: translateY(-1px) scale(1.04);
+            box-shadow: 0 16px 28px rgba(16, 185, 129, 0.45), inset 0 1px 0 rgba(255,255,255,0.22);
+        }
+        .send-btn:active {
+            transform: translateY(0) scale(0.98);
+        }
+        .send-btn i {
+            font-size: 1.2rem;
+            color: #ffffff;
+        }
+
+        #attach-file-btn {
+            flex: 0 0 56px;
+            width: 56px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+            height: 56px;
+            border-radius: 18px;
+            font-size: 18px;
+        }
+
+        .toast-container {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+        .toast {
+            min-width: 280px;
+            max-width: min(420px, calc(100vw - 32px));
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid #3f3f46;
+            background: #18181b;
             color: #e4e4e7;
-            border-bottom-left-radius: 4px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+            pointer-events: auto;
+            animation: toast-in 180ms ease-out;
         }
-        .scrollbar-thin::-webkit-scrollbar {
-            width: 4px;
+        .toast.success { border-color: #10b981; }
+        .toast.error { border-color: #ef4444; }
+        .toast.info { border-color: #3b82f6; }
+        @keyframes toast-in {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        .scrollbar-thin::-webkit-scrollbar-thumb {
-            background: #4b5563;
-            border-radius: 20px;
+
+        .modal-overlay {
+            padding: 16px;
+            overflow-y: auto;
         }
-        
-        /* Responsive */
-        @media (max-width: 768px) {
-            .md\:flex-row { flex-direction: column; }
-            .md\:w-80 { width: 100%; }
-            .md\:hidden { display: block; }
+        .modal-panel {
+            margin: auto;
+            width: min(100%, calc(100vw - 32px));
+            max-height: calc(100vh - 32px);
+        }
+
+        #key-modal > div,
+        #change-password-modal > div,
+        #create-user-modal > div {
+            width: min(420px, calc(100vw - 32px));
+            max-width: calc(100vw - 32px);
+        }
+
+        #users-modal > div {
+            width: min(820px, calc(100vw - 32px));
+            max-width: calc(100vw - 32px);
+            max-height: calc(100vh - 32px);
+            overflow-y: auto;
+        }
+
+        #new-chat-modal > div,
+        #group-modal > div {
+            width: min(620px, calc(100vw - 32px));
+            max-width: calc(100vw - 32px);
+        }
+
+        #delete-chat-modal > div {
+            width: min(480px, calc(100vw - 32px));
+            max-width: calc(100vw - 32px);
+        }
+
+        #reset-all-modal > div {
+            width: min(520px, calc(100vw - 32px));
+            max-width: calc(100vw - 32px);
+        }
+
+        .selection-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            max-height: 320px;
+            overflow-y: auto;
+            padding: 4px;
+        }
+
+        .selection-card {
+            border: 1px solid #3f3f46;
+            background: rgba(39, 39, 42, 0.92);
+            border-radius: 16px;
+            padding: 14px 16px;
+            cursor: pointer;
+            transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+        }
+
+        .selection-card:hover {
+            transform: translateY(-1px);
+            border-color: #34d399;
+            background: rgba(24, 24, 27, 0.98);
+        }
+
+        .selection-card.active {
+            border-color: #60a5fa;
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.16), rgba(30, 64, 175, 0.2));
+            box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.25);
+        }
+
+        .selection-card-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #f4f4f5;
+        }
+
+        .selection-card-hint {
+            font-size: 11px;
+            margin-top: 6px;
+            color: #71717a;
+        }
+
+        .selected-users {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            min-height: 24px;
+        }
+
+        .selected-user-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: rgba(59, 130, 246, 0.16);
+            border: 1px solid rgba(96, 165, 250, 0.35);
+            color: #dbeafe;
+            font-size: 12px;
+        }
+
+        .modal-muted {
+            font-size: 13px;
+            color: #a1a1aa;
+            line-height: 1.5;
+        }
+
+        button.bg-emerald-500 {
+            background-color: #10b981;
+        }
+        button.bg-emerald-500:hover {
+            background-color: #059669;
+        }
+
+        /* Кнопка отправки сообщения */
+        button.w-14.h-14.rounded-3xl.bg-emerald-500 {
+            background: linear-gradient(135deg, #10b981, #059669);
+            box-shadow: 0 10px 15px rgba(16, 185, 129, 0.3);
+            font-size: 1.4rem;
+        }
+
+        button.w-14.h-14.rounded-3xl.bg-emerald-500:hover {
+            background: linear-gradient(135deg, #059669, #047857);
+            transform: scale(1.08);
+            box-shadow: 0 15px 25px rgba(16, 185, 129, 0.5);
+        }
+
+        /* Кнопка "+ Новый чат" */
+        button.w-full.bg-zinc-800 {
+            background-color: #27272a;
+            color: #34d399;
+            border: 1px solid #3f3f46;
+            font-weight: 500;
+        }
+
+        button.w-full.bg-zinc-800:hover {
+            background-color: #3f3f46;
+            border-color: #10b981;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        /* Поля ввода — фиксируем ширину */
+        input.w-full {
+            max-width: 100%;
+        }
+
+        .max-w-md input, .max-w-md button {
+            width: 100%;
+        }
+
+        .background-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+        .background-option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 14px;
+            border: 1px solid #3f3f46;
+            background: #18181b;
+            color: #e4e4e7;
+            text-align: left;
+        }
+        .background-option:hover {
+            border-color: #10b981;
+            background: #202024;
+        }
+        .background-option.active {
+            border-color: #10b981;
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+        }
+        .background-swatch {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            flex-shrink: 0;
+        }
+        .background-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .background-title {
+            font-weight: 600;
+            line-height: 1.2;
+        }
+        .background-hint {
+            color: #a1a1aa;
+            font-size: 12px;
+            line-height: 1.2;
+        }
+
+        @media (max-width: 560px) {
+            .background-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -224,636 +572,270 @@
 
     <!-- ЛОГИН -->
     <div id="login-screen" class="flex items-center justify-center h-full">
-        <div class="w-full max-w-xs p-6">
+        <div class="w-full max-w-md p-6">
+            <div class="mb-8 text-center">
+                <h1 class="text-3xl font-bold text-emerald-400">Вход</h1>
+            </div>
             <input id="username" type="text" placeholder="Логин" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 mb-4 outline-none focus:border-emerald-500">
             <input id="password" type="password" placeholder="Пароль" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 mb-6 outline-none focus:border-emerald-500">
-            <button onclick="login()" class="w-full bg-emerald-500 hover:bg-emerald-600 py-4 rounded-2xl font-semibold text-lg transition">Войти</button>
+            <button id="login-submit-btn" type="button" class="w-full bg-emerald-500 hover:bg-emerald-600 py-4 rounded-2xl font-semibold text-lg transition">Войти</button>
         </div>
     </div>
 
     <!-- ЧАТ -->
     <div id="chat-screen" class="hidden h-full flex flex-col md:flex-row">
         <!-- SIDEBAR -->
-        <div class="w-full md:w-80 bg-zinc-900 border-r border-zinc-800 flex flex-col">
+        <div id="chat-sidebar" class="w-full md:w-80 bg-zinc-900 border-r border-zinc-800 flex flex-col">
             <div class="p-5 border-b border-zinc-800 flex items-center gap-3">
                 <div class="flex-1">
                     <div id="my-name" class="font-semibold"></div>
                 </div>
-                <button id="admin-btn" onclick="showUsersModal()" class="text-zinc-400 hover:text-blue-400 hidden" title="Управление пользователями"><i class="fa-solid fa-users"></i></button>
-                <button onclick="showChangePasswordModal()" class="text-zinc-400 hover:text-emerald-400" title="Смена пароля"><i class="fa-solid fa-lock"></i></button>
-                <button onclick="logout()" class="text-zinc-400 hover:text-red-400"><i class="fa-solid fa-right-from-bracket"></i></button>
+                <button id="admin-btn" type="button" class="icon-btn text-emerald-400 hover:text-white hidden" title="Управление пользователями">
+                    <i class="fa-solid fa-users"></i>
+                </button>
+                <button id="open-change-password-btn" type="button" class="icon-btn text-emerald-400 hover:text-white" title="Смена пароля">
+                    <i class="fa-solid fa-lock"></i>
+                </button>
+                <button id="open-background-btn" type="button" class="icon-btn text-emerald-400 hover:text-white" title="Фон чата">
+                    <i class="fa-solid fa-image"></i>
+                </button>
+                <button id="logout-btn" type="button" class="icon-btn text-emerald-400 hover:text-white">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
             </div>
 
             <div class="p-4">
                 <div class="relative">
-                    <input id="search" type="text" placeholder="Поиск контактов..." class="w-full bg-zinc-800 border border-zinc-700 rounded-3xl py-3 px-5 pl-12 outline-none">
-                    <i class="fa-solid fa-magnifying-glass absolute left-5 top-3.5 text-zinc-500"></i>
+                    <input id="search" type="text" placeholder="Поиск контактов..." class="w-full bg-zinc-800 border border-zinc-700 rounded-3xl py-3 px-5 outline-none">
+                    <i class="fa-solid fa-magnifying-glass absolute left-5 top-3.5 text-emerald-400"></i>
                 </div>
             </div>
 
             <div class="flex-1 overflow-y-auto scrollbar-thin" id="chats-list"></div>
 
             <div class="p-4 border-t border-zinc-800">
-                <button onclick="newChatPrompt()" class="w-full bg-zinc-800 hover:bg-zinc-700 py-3 rounded-2xl flex items-center justify-center gap-2 text-emerald-400">
-                    <i class="fa-solid fa-plus"></i> Новый чат
-                </button>
+                <div class="flex flex-col gap-3">
+                    <button id="new-chat-btn" type="button" class="w-full bg-zinc-800 hover:bg-zinc-700 py-3 rounded-2xl flex items-center justify-center gap-2 text-emerald-400">
+                        <i class="fa-solid fa-plus"></i> Новый чат
+                    </button>
+                    <button id="new-group-btn" type="button" class="w-full bg-zinc-800 hover:bg-zinc-700 py-3 rounded-2xl flex items-center justify-center gap-2 text-blue-400">
+                        <i class="fa-solid fa-user-group"></i> Новая группа
+                    </button>
+                </div>
             </div>
         </div>
+        <div id="mobile-overlay"></div>
 
         <!-- MAIN -->
-        <div class="flex-1 flex flex-col">
+        <div id="chat-main" class="flex-1 flex flex-col">
             <div class="h-16 bg-zinc-900 border-b border-zinc-800 px-6 flex items-center justify-between">
                 <div class="flex items-center gap-4">
-                    <button onclick="toggleMobileSidebar()" class="md:hidden text-3xl text-zinc-400">☰</button>
+                    <button id="mobile-menu-btn" type="button" class="md:hidden text-3xl text-emerald-400">&#9776;</button>
                     <div id="chat-header-avatar" class="w-10 h-10 rounded-2xl overflow-hidden ring-2 ring-emerald-500/30 bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white font-semibold"></div>
                     <div>
                         <div id="chat-header-name" class="font-semibold text-lg">Выберите чат</div>
                     </div>
                 </div>
                 <div class="flex gap-6">
-                    <button onclick="showKeyModal()" class="text-zinc-400 hover:text-white"><i class="fa-solid fa-key"></i></button>
+                    <button id="open-key-modal-btn" type="button" class="icon-btn text-emerald-400 hover:text-white">
+                        <i class="fa-solid fa-key"></i>
+                    </button>
                 </div>
             </div>
 
-            <div id="messages" class="flex-1 overflow-y-auto p-6 chat-bg scrollbar-thin space-y-6"></div>
+            <div id="messages" class="flex-1 overflow-y-auto p-6 chat-bg theme-aurora scrollbar-thin space-y-6"></div>
 
             <div class="bg-zinc-900 border-t border-zinc-800 p-5">
                 <div class="max-w-3xl mx-auto flex gap-3">
-                    <input id="message-input" onkeydown="if(event.key==='Enter') sendMessage()" placeholder="Напишите сообщение..." class="flex-1 bg-zinc-800 border border-zinc-700 focus:border-emerald-500 rounded-3xl py-4 px-6 outline-none">
-                    <button onclick="sendMessage()" class="bg-emerald-500 hover:bg-emerald-600 w-14 h-14 rounded-3xl flex items-center justify-center text-2xl transition shadow-xl"><i class="fa-solid fa-paper-plane"></i></button>
+                    <input id="file-input" type="file" class="hidden">
+                    <button id="attach-file-btn" type="button" class="icon-btn text-blue-400 hover:text-white" title="Прикрепить файл">
+                        <i class="fa-solid fa-paperclip"></i>
+                    </button>
+                    <input id="message-input" placeholder="Напишите сообщение..." class="flex-1 bg-zinc-800 border border-zinc-700 focus:border-emerald-500 rounded-3xl py-4 px-6 outline-none">
+                    <button id="send-message-btn" type="button" class="send-btn flex items-center justify-center transition">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
                 </div>
-                <div class="text-center text-10px text-zinc-500 mt-4">AES-256 E2EE • сообщения хранятся зашифрованными</div>
+                <div class="text-center text-10px text-zinc-500 mt-4">AES-256 E2EE • сообщения и файлы хранятся зашифрованными</div>
             </div>
         </div>
     </div>
 
     <!-- MODAL KEY -->
-    <div id="key-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50">
-        <div class="bg-zinc-900 rounded-3xl p-8 max-w-sm w-full mx-4">
+    <div id="key-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 modal-overlay">
+        <div class="bg-zinc-900 rounded-3xl p-8 max-w-sm w-full modal-panel">
             <h3 class="text-2xl font-semibold mb-6 flex items-center gap-3"><i class="fa-solid fa-key text-emerald-400"></i> Секретный ключ чата</h3>
             
-            <!-- QR Код -->
             <div id="qr-container" class="flex justify-center mb-6 bg-white p-4 rounded-2xl" style="display: none;">
                 <div id="qrcode"></div>
             </div>
             
-            <!-- Поле ввода ключа -->
-            <input id="key-input" type="text" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 text-lg outline-none" placeholder="Введите общий ключ (мин. 8 символов)" oninput="generateQRCode(this.value)">
+            <input id="key-input" type="text" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 text-lg outline-none" placeholder="Введите общий ключ (мин. 8 символов)">
             
-            <!-- Кнопки -->
             <div class="mt-8 flex gap-3">
-                <button onclick="generateRandomKey()" class="flex-1 py-3 bg-blue-500 hover:bg-blue-600 rounded-2xl font-medium text-sm flex items-center justify-center gap-2">
+                <button id="generate-key-btn" type="button" class="flex-1 py-3 bg-blue-500 hover:bg-blue-600 rounded-2xl font-medium text-sm flex items-center justify-center gap-2">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Сгенерировать
                 </button>
             </div>
-            
+
             <div class="mt-4 flex gap-3">
-                <button onclick="closeKeyModal()" class="flex-1 py-4 border border-zinc-700 rounded-2xl hover:bg-zinc-800">Отмена</button>
-                <button onclick="saveKey()" class="flex-1 py-4 bg-emerald-500 hover:bg-emerald-600 rounded-2xl font-medium">Сохранить</button>
+                <button id="close-key-modal-btn" type="button" class="flex-1 py-4 border border-zinc-700 rounded-2xl hover:bg-zinc-800">Отмена</button>
+                <button id="save-key-btn" type="button" class="flex-1 py-4 bg-emerald-500 hover:bg-emerald-600 rounded-2xl font-medium">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL NEW CHAT -->
+    <div id="new-chat-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 modal-overlay">
+        <div class="bg-zinc-900 rounded-3xl p-8 w-full modal-panel">
+            <h3 class="text-2xl font-semibold mb-4 flex items-center gap-3"><i class="fa-solid fa-comment-medical text-emerald-400"></i> Новый чат</h3>
+            <p class="modal-muted mb-6">Выберите одного пользователя, чтобы сразу открыть личный чат.</p>
+            <div id="new-chat-users" class="selection-list mb-6"></div>
+            <div class="flex gap-3">
+                <button id="close-new-chat-modal-btn" type="button" class="flex-1 py-4 border border-zinc-700 rounded-2xl hover:bg-zinc-800">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL GROUP -->
+    <div id="group-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 modal-overlay">
+        <div class="bg-zinc-900 rounded-3xl p-8 w-full modal-panel">
+            <h3 class="text-2xl font-semibold mb-4 flex items-center gap-3"><i class="fa-solid fa-user-group text-blue-400"></i> Новая группа</h3>
+            <p class="modal-muted mb-6">Задайте название и отметьте участников кликом. Вы будете добавлены автоматически.</p>
+
+            <input id="group-title-input" type="text" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 text-lg outline-none mb-4" placeholder="Название группы">
+
+            <div class="text-sm text-zinc-400 mb-4">Выбранные участники</div>
+            <div id="group-selected-users" class="selected-users mb-6"></div>
+
+            <div id="group-users" class="selection-list mb-6"></div>
+
+            <div class="flex gap-3">
+                <button id="close-group-modal-btn" type="button" class="flex-1 py-4 border border-zinc-700 rounded-2xl hover:bg-zinc-800">Отмена</button>
+                <button id="submit-group-modal-btn" type="button" class="flex-1 py-4 bg-blue-500 hover:bg-blue-600 rounded-2xl font-medium">Создать группу</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DELETE CHAT -->
+    <div id="delete-chat-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 modal-overlay">
+        <div class="bg-zinc-900 rounded-3xl p-8 w-full modal-panel">
+            <h3 class="text-2xl font-semibold mb-4 flex items-center gap-3"><i class="fa-solid fa-triangle-exclamation text-red-400"></i> Удаление чата</h3>
+            <p id="delete-chat-modal-text" class="modal-muted mb-8">Удалить чат?</p>
+            <div class="flex gap-3">
+                <button id="close-delete-chat-modal-btn" type="button" class="flex-1 py-4 border border-zinc-700 rounded-2xl hover:bg-zinc-800">Отмена</button>
+                <button id="confirm-delete-chat-modal-btn" type="button" class="flex-1 py-4 bg-red-400 rounded-2xl font-medium text-zinc-950">Удалить</button>
             </div>
         </div>
     </div>
 
     <!-- MODAL CHANGE PASSWORD -->
-    <div id="change-password-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50">
-        <div class="bg-zinc-900 rounded-3xl p-8 max-w-sm w-full mx-4">
+    <div id="change-password-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 modal-overlay">
+        <div class="bg-zinc-900 rounded-3xl p-8 max-w-sm w-full modal-panel">
             <h3 class="text-2xl font-semibold mb-6 flex items-center gap-3"><i class="fa-solid fa-lock text-emerald-400"></i> Смена пароля</h3>
             <input id="old-password" type="password" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 text-lg outline-none mb-4" placeholder="Старый пароль">
             <input id="new-password" type="password" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 text-lg outline-none mb-4" placeholder="Новый пароль">
             <input id="new-password-confirm" type="password" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 text-lg outline-none mb-8" placeholder="Подтверждение пароля">
             <div class="flex gap-3">
-                <button onclick="closeChangePasswordModal()" class="flex-1 py-4 border border-zinc-700 rounded-2xl hover:bg-zinc-800">Отмена</button>
-                <button onclick="submitChangePassword()" class="flex-1 py-4 bg-emerald-500 hover:bg-emerald-600 rounded-2xl font-medium">Изменить</button>
+                <button id="close-change-password-btn" type="button" class="flex-1 py-4 border border-zinc-700 rounded-2xl hover:bg-zinc-800">Отмена</button>
+                <button id="submit-change-password-btn" type="button" class="flex-1 py-4 bg-emerald-500 hover:bg-emerald-600 rounded-2xl font-medium">Изменить</button>
             </div>
         </div>
     </div>
 
     <!-- MODAL USERS MANAGEMENT -->
-    <div id="users-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50">
-        <div class="bg-zinc-900 rounded-3xl p-8 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-            <h3 class="text-2xl font-semibold mb-6 flex items-center gap-3"><i class="fa-solid fa-users text-blue-400"></i> Управление пользователями</h3>
+    <div id="users-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 modal-overlay">
+        <div class="bg-zinc-900 rounded-3xl p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto modal-panel">
+            <h3 class="text-2xl font-semibold mb-6 flex items-center gap-3"><i class="fa-solid fa-users text-emerald-400"></i> Управление пользователями</h3>
             <div id="users-list" class="space-y-3 mb-8"></div>
             <div class="flex gap-3">
-                <button onclick="showCreateUserModal()" class="flex-1 py-4 bg-blue-500 hover:bg-blue-600 rounded-2xl font-medium"><i class="fa-solid fa-plus"></i> Новый пользователь</button>
-                <button onclick="closeUsersModal()" class="flex-1 py-4 border border-zinc-700 rounded-2xl hover:bg-zinc-800">Закрыть</button>
+                <button id="show-create-user-btn" type="button" class="flex-1 py-4 bg-blue-500 hover:bg-blue-600 rounded-2xl font-medium"><i class="fa-solid fa-plus"></i> Новый пользователь</button>
+                <button id="export-all-btn" type="button" class="flex-1 py-4 bg-emerald-500 hover:bg-emerald-600 rounded-2xl font-medium"><i class="fa-solid fa-download"></i> Сохранить всё</button>
+                <button id="reset-all-btn" type="button" class="flex-1 py-4 bg-red-400 rounded-2xl font-medium text-zinc-950"><i class="fa-solid fa-trash-can"></i> Стереть всё</button>
+                <button id="close-users-modal-btn" type="button" class="flex-1 py-4 border border-zinc-700 rounded-2xl hover:bg-zinc-800">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL RESET ALL -->
+    <div id="reset-all-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 modal-overlay">
+        <div class="bg-zinc-900 rounded-3xl p-8 w-full modal-panel">
+            <h3 class="text-2xl font-semibold mb-4 flex items-center gap-3"><i class="fa-solid fa-skull-crossbones text-red-400"></i> Полный сброс</h3>
+            <p class="modal-muted mb-4">Это удалит всех пользователей, все чаты, всю историю сообщений и все загруженные файлы.</p>
+            <p class="modal-muted mb-8">После сброса останется только администратор из `ADMIN_PASSWORD`, и потребуется войти заново.</p>
+            <div class="flex gap-3">
+                <button id="close-reset-all-modal-btn" type="button" class="flex-1 py-4 border border-zinc-700 rounded-2xl hover:bg-zinc-800">Отмена</button>
+                <button id="confirm-reset-all-modal-btn" type="button" class="flex-1 py-4 bg-red-400 rounded-2xl font-medium text-zinc-950">Стереть всё</button>
             </div>
         </div>
     </div>
 
     <!-- MODAL CREATE USER -->
-    <div id="create-user-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50">
-        <div class="bg-zinc-900 rounded-3xl p-8 max-w-sm w-full mx-4">
-            <h3 class="text-2xl font-semibold mb-6 flex items-center gap-3"><i class="fa-solid fa-user-plus text-blue-400"></i> Создать пользователя</h3>
+    <div id="create-user-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 modal-overlay">
+        <div class="bg-zinc-900 rounded-3xl p-8 max-w-sm w-full modal-panel">
+            <h3 class="text-2xl font-semibold mb-6 flex items-center gap-3"><i class="fa-solid fa-user-plus text-emerald-400"></i> Новый пользователь</h3>
             <input id="new-user-login" type="text" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 text-lg outline-none mb-4" placeholder="Логин">
             <input id="new-user-password" type="password" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-6 text-lg outline-none mb-8" placeholder="Пароль">
             <div class="flex gap-3">
-                <button onclick="closeCreateUserModal()" class="flex-1 py-4 border border-zinc-700 rounded-2xl hover:bg-zinc-800">Отмена</button>
-                <button onclick="submitCreateUser()" class="flex-1 py-4 bg-blue-500 hover:bg-blue-600 rounded-2xl font-medium">Создать</button>
+                <button id="close-create-user-btn" type="button" class="flex-1 py-4 border border-zinc-700 rounded-2xl hover:bg-zinc-800">Отмена</button>
+                <button id="submit-create-user-btn" type="button" class="flex-1 py-4 bg-blue-500 hover:bg-blue-600 rounded-2xl font-medium">Создать</button>
             </div>
         </div>
     </div>
 
-    <script>
-        let socket = null;
-        let currentUser = null;
-        let currentChatId = null;
-        let currentChatPartner = null;
-        let chatKeys = {}; // Будет заполнено при загрузке
-
-        // 🔐 Функции для безопасного хранения ключей
-        function encryptChatKeys(keys, token) {
-            return CryptoJS.AES.encrypt(JSON.stringify(keys), token).toString();
-        }
-
-        function decryptChatKeys(encrypted, token) {
-            try {
-                const bytes = CryptoJS.AES.decrypt(encrypted, token);
-                return JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
-            } catch (e) {
-                console.warn('Ошибка при расшифровке ключей:', e);
-                return {};
-            }
-        }
-
-        function saveChatKeys(keys) {
-            if (!currentUser || !currentUser.token) return;
-            const encrypted = encryptChatKeys(keys, currentUser.token);
-            localStorage.setItem('encryptedChatKeys', encrypted);
-        }
-
-        function loadChatKeys() {
-            if (!currentUser || !currentUser.token) return {};
-            const encrypted = localStorage.getItem('encryptedChatKeys');
-            if (!encrypted) return {};
-            return decryptChatKeys(encrypted, currentUser.token);
-        }
-
-        function getInitialAvatar(username) {
-            return username.charAt(0).toUpperCase();
-        }
-
-        async function login() {
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value.trim();
-            if (!username || !password) return alert('Введите логин и пароль');
-
-            try {
-                const res = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-                const data = await res.json();
-                if (data.error) return alert(data.error);
-
-                currentUser = data;
-                localStorage.setItem('token', data.token);
-                
-                // Загружаем расшифрованные ключи
-                chatKeys = loadChatKeys();
-
-                document.getElementById('login-screen').classList.add('hidden');
-                document.getElementById('chat-screen').classList.remove('hidden');
-
-                document.getElementById('my-name').textContent = currentUser.username;
-
-                // Показываем кнопку управления пользователями только для админа
-                if (currentUser.username === 'admin') {
-                    document.getElementById('admin-btn').classList.remove('hidden');
-                }
-
-                initSocket();
-            } catch (e) {
-                alert('Ошибка подключения');
-            }
-        }
-
-        function logout() {
-            localStorage.removeItem('token');
-            localStorage.removeItem('encryptedChatKeys'); // 🔐 Очищаем зашифрованные ключи
-            location.reload();
-        }
-
-        function initSocket() {
-            // 🔐 Используем текущий домен вместо хардкода
-            socket = io(window.location.origin, { auth: { token: currentUser.token } });
-
-            socket.on('connect', () => socket.emit('get-chats'));
-
-            socket.on('your-chats', renderChatsList);
-
-            socket.on('chat-history', messages => renderMessages(messages, false));
-
-            socket.on('new-message', msg => {
-                // Если это не текущий открытый чат — игнорируем
-                if (msg.chatId !== currentChatId) return;
-
-                renderMessages([msg], true);
-            });
-
-            socket.on('chat-deleted', (deletedChatId) => {
-                if (deletedChatId === currentChatId) {
-                    currentChatId = null;
-                    currentChatPartner = null;
-                    document.getElementById('messages').innerHTML = '';
-                    document.getElementById('chat-header-name').textContent = 'Выберите чат';
-                }
-                socket.emit('get-chats');
-            });
-
-            socket.on('error', (message) => {
-                alert('Ошибка: ' + message);
-            });
-        }
-
-        function renderChatsList(usernames) {
-            const container = document.getElementById('chats-list');
-            container.innerHTML = '';
-
-            usernames.forEach(username => {
-                if (username === currentUser.username) return;
-                const chatId = [currentUser.username, username].sort().join('-');
-
-                const el = document.createElement('div');
-                el.className = `px-5 py-4 hover:bg-zinc-800 flex gap-4 items-center border-b border-zinc-800 group ${currentChatId === chatId ? 'bg-zinc-800' : ''}`;
-                el.innerHTML = `
-                    <div class="flex-1 cursor-pointer">
-                        <div class="font-medium">${username}</div>
-                    </div>
-                    <button class="delete-chat-btn text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition" title="Удалить чат"><i class="fa-solid fa-trash"></i></button>
-                `;
-                
-                // Обработчик для удаления чата
-                const deleteBtn = el.querySelector('.delete-chat-btn');
-                deleteBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    deleteChat(chatId, username);
-                });
-                
-                el.addEventListener('click', () => openChat(username, chatId));
-                container.appendChild(el);
-            });
-        }
-
-        function openChat(partner, chatId) {
-            if (!partner || partner.trim() === '') {
-                alert('Невалидное имя пользователя');
-                return;
-            }
-            currentChatId = chatId;
-            currentChatPartner = partner;
-
-            document.getElementById('chat-header-avatar').innerHTML = `<div class="w-full h-full bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white text-lg font-semibold">${partner.charAt(0).toUpperCase()}</div>`;
-            document.getElementById('chat-header-name').textContent = partner;
-
-            socket.emit('join-chat', partner);
-            setTimeout(() => socket.emit('join-chat', partner), 200);
-        }
-
-        function newChatPrompt() {
-            const username = prompt('Логин собеседника:');
-            if (!username || username === currentUser.username) return;
-            const chatId = [currentUser.username, username].sort().join('-');
-            openChat(username, chatId);
-        }
-
-        function renderMessages(messages, append = false) {
-            const container = document.getElementById('messages');
-            if (!append) container.innerHTML = '';
-
-            const key = chatKeys[currentChatId] || 'defaultkey';
-
-            messages.forEach(msg => {
-                const isMe = msg.from === currentUser.username;
-                const text = decrypt(msg.cipher, key) || '[Ошибка расшифровки]';
-
-                const div = document.createElement('div');
-                div.className = `flex ${isMe ? 'justify-end' : 'justify-start'}`;
-                
-                const messageBubble = document.createElement('div');
-                messageBubble.className = `message-bubble ${isMe ? 'me' : 'them'}`;
-                
-                const textDiv = document.createElement('div');
-                textDiv.className = 'text-15px break-words';
-                textDiv.textContent = text; // 🔐 Используем textContent вместо innerHTML для защиты от XSS
-                
-                const timeDiv = document.createElement('div');
-                timeDiv.className = 'text-10px opacity-70 text-right mt-1';
-                timeDiv.textContent = msg.time;
-                
-                messageBubble.appendChild(textDiv);
-                messageBubble.appendChild(timeDiv);
-                div.appendChild(messageBubble);
-                container.appendChild(div);
-            });
-
-            container.scrollTop = container.scrollHeight;
-        }
-
-        function encrypt(text, key) {
-            return CryptoJS.AES.encrypt(text, key).toString();
-        }
-
-        function decrypt(cipher, key) {
-            try {
-                const bytes = CryptoJS.AES.decrypt(cipher, key);
-                return bytes.toString(CryptoJS.enc.Utf8) || '[Ошибка]';
-            } catch {
-                return '[Ошибка расшифровки]';
-            }
-        }
-
-        function sendMessage() {
-            const input = document.getElementById('message-input');
-            const text = input.value.trim();
-            if (!text || !currentChatId || !currentChatPartner) return;
-
-            const key = chatKeys[currentChatId];
-            if (!key) return alert('Задайте ключ чата (иконка замка)');
-
-            const cipher = encrypt(text, key);
-            const time = new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
-
-            socket.emit('send-message', { otherUsername: currentChatPartner, cipher, time });
-
-            input.value = '';
-        }
-
-        function showKeyModal() {
-            if (!currentChatId) return alert('Выберите чат');
-            const inputEl = document.getElementById('key-input');
-            inputEl.value = chatKeys[currentChatId] || '';
-            document.getElementById('key-modal').classList.remove('hidden');
-            generateQRCode(inputEl.value);
-        }
-
-        function closeKeyModal() { 
-            document.getElementById('key-modal').classList.add('hidden');
-            document.getElementById('qr-container').style.display = 'none';
-            document.getElementById('qrcode').innerHTML = '';
-        }
-
-        function generateRandomKey() {
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-            let key = '';
-            for (let i = 0; i < 32; i++) {
-                key += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            const inputEl = document.getElementById('key-input');
-            inputEl.value = key;
-            generateQRCode(key);
-        }
-
-        function generateQRCode(text) {
-            if (!text || text.length < 8) {
-                document.getElementById('qr-container').style.display = 'none';
-                document.getElementById('qrcode').innerHTML = '';
-                return;
-            }
-            
-            document.getElementById('qr-container').style.display = 'flex';
-            document.getElementById('qrcode').innerHTML = '';
-            
-            new QRCode(document.getElementById('qrcode'), {
-                text: text,
-                width: 200,
-                height: 200,
-                colorDark: '#000000',
-                colorLight: '#ffffff',
-                correctLevel: QRCode.CorrectLevel.H
-            });
-        }
-
-        function showChangePasswordModal() {
-            document.getElementById('change-password-modal').classList.remove('hidden');
-            document.getElementById('old-password').value = '';
-            document.getElementById('new-password').value = '';
-            document.getElementById('new-password-confirm').value = '';
-            document.getElementById('old-password').focus();
-        }
-
-        function closeChangePasswordModal() {
-            document.getElementById('change-password-modal').classList.add('hidden');
-        }
-
-        function saveKey() {
-            const newKey = document.getElementById('key-input').value.trim();
-            if (newKey.length < 8) return alert('Минимум 8 символов');
-            chatKeys[currentChatId] = newKey;
-            saveChatKeys(chatKeys); // 🔐 Сохраняем в зашифрованном виде
-            closeKeyModal();
-            alert('Ключ сохранён (зашифрован и защищен)');
-            socket.emit('join-chat', currentChatPartner);
-        }
-
-        function deleteChat(chatId, username) {
-            if (!confirm(`Удалить чат с ${username}? Сообщения будут удалены.`)) return;
-            
-            // 🔐 Отправляем username вместо chatId для безопасности
-            socket.emit('delete-chat', username);
-            
-            // Удаляем из UI
-            currentChatId = null;
-            currentChatPartner = null;
-            document.getElementById('messages').innerHTML = '';
-            document.getElementById('chat-header-name').textContent = 'Выберите чат';
-            
-            // Обновляем список чатов
-            socket.emit('get-chats');
-        }
-
-        async function submitChangePassword() {
-            const oldPassword = document.getElementById('old-password').value.trim();
-            const newPassword = document.getElementById('new-password').value.trim();
-            const confirmPassword = document.getElementById('new-password-confirm').value.trim();
-
-            if (!oldPassword || !newPassword) return alert('Заполните все поля');
-            if (newPassword !== confirmPassword) return alert('Пароли не совпадают');
-            
-            // 🔐 Проверка требований пароля на фронтенде
-            if (newPassword.length < 12) return alert('Пароль должен быть минимум 12 символов');
-            if (!/[A-Z]/.test(newPassword)) return alert('Пароль должен содержать заглавные буквы');
-            if (!/[a-z]/.test(newPassword)) return alert('Пароль должен содержать строчные буквы');
-            if (!/\d/.test(newPassword)) return alert('Пароль должен содержать цифры');
-
-            try {
-                const token = localStorage.getItem('token');
-                const res = await fetch('/api/change-password', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ oldPassword, newPassword })
-                });
-                const data = await res.json();
-                if (data.error) return alert(data.error);
-
-                alert('Пароль успешно изменён');
-                closeChangePasswordModal();
-            } catch (e) {
-                alert('Ошибка при смене пароля');
-            }
-        }
-
-        function toggleMobileSidebar() {}
-
-        async function showUsersModal() {
-            document.getElementById('users-modal').classList.remove('hidden');
-            
-            try {
-                const token = localStorage.getItem('token');
-                const res = await fetch('/api/users', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const users = await res.json();
-                
-                const container = document.getElementById('users-list');
-                container.innerHTML = '';
-                
-                users.forEach(user => {
-                    const div = document.createElement('div');
-                    div.className = 'bg-zinc-800 p-4 rounded-2xl flex items-center justify-between';
-                    
-                    const userInfo = document.createElement('div');
-                    userInfo.className = 'flex items-center gap-4';
-                    const username = document.createElement('span');
-                    username.className = 'font-medium';
-                    username.textContent = user.username;
-                    userInfo.appendChild(username);
-                    
-                    const button = document.createElement('button');
-                    button.className = 'bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg text-sm font-medium';
-                    button.textContent = 'Смена пароля';
-                    button.onclick = () => showAdminPasswordModal(user.username);
-                    
-                    div.appendChild(userInfo);
-                    div.appendChild(button);
-                    container.appendChild(div);
-                });
-            } catch (e) {
-                alert('Ошибка при загрузке списка пользователей');
-            }
-        }
-
-        function closeUsersModal() {
-            document.getElementById('users-modal').classList.add('hidden');
-        }
-
-        function showCreateUserModal() {
-            document.getElementById('create-user-modal').classList.remove('hidden');
-            document.getElementById('new-user-login').value = '';
-            document.getElementById('new-user-password').value = '';
-            document.getElementById('new-user-login').focus();
-        }
-
-        function closeCreateUserModal() {
-            document.getElementById('create-user-modal').classList.add('hidden');
-        }
-
-        async function submitCreateUser() {
-            const username = document.getElementById('new-user-login').value.trim();
-            const password = document.getElementById('new-user-password').value.trim();
-
-            if (!username || !password) return alert('Заполните все поля');
-            
-            // 🔐 Валидация username
-            const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
-            if (!usernameRegex.test(username)) {
-                return alert('Логин: 3-20 символов (буквы, цифры, подчеркивание)');
-            }
-            
-            // 🔐 Валидация пароля
-            if (password.length < 12) return alert('Пароль должен быть минимум 12 символов');
-            if (!/[A-Z]/.test(password)) return alert('Пароль должен содержать заглавные буквы');
-            if (!/[a-z]/.test(password)) return alert('Пароль должен содержать строчные буквы');
-            if (!/\d/.test(password)) return alert('Пароль должен содержать цифры');
-
-            try {
-                const res = await fetch('/api/create-user', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-                const data = await res.json();
-                if (data.error) return alert(data.error);
-
-                alert(`Пользователь ${username} успешно создан`);
-                closeCreateUserModal();
-                showUsersModal();
-            } catch (e) {
-                alert('Ошибка при создании пользователя');
-            }
-        }
-
-        function showAdminPasswordModal(username) {
-            const newPassword = prompt(`Введите новый пароль для ${username}:`);
-            if (!newPassword) return;
-            
-            // 🔐 Валидация пароля
-            if (newPassword.length < 12) return alert('Пароль должен быть минимум 12 символов');
-            if (!/[A-Z]/.test(newPassword)) return alert('Пароль должен содержать заглавные буквы');
-            if (!/[a-z]/.test(newPassword)) return alert('Пароль должен содержать строчные буквы');
-            if (!/\d/.test(newPassword)) return alert('Пароль должен содержать цифры');
-            
-            changeUserPasswordAsAdmin(username, newPassword);
-        }
-
-        async function changeUserPasswordAsAdmin(username, newPassword) {
-            try {
-                const token = localStorage.getItem('token');
-                const res = await fetch('/api/change-password', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ targetUsername: username, newPassword })
-                });
-                const data = await res.json();
-                if (data.error) return alert(data.error);
-
-                alert(`Пароль пользователя ${username} успешно изменён`);
-                showUsersModal();
-            } catch (e) {
-                alert('Ошибка при смене пароля');
-            }
-        }
-
-        function toggleMobileSidebar() {}
-
-
-        window.onload = async () => {
-            const token = localStorage.getItem('token');
-            if (!token) return;
-
-            try {
-                const res = await fetch('/api/me', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (!res.ok) throw new Error('Токен недействителен');
-                const data = await res.json();
-                currentUser = { ...data, token };
-
-                // 🔐 Загружаем расшифрованные ключи
-                chatKeys = loadChatKeys();
-
-                document.getElementById('login-screen').classList.add('hidden');
-                document.getElementById('chat-screen').classList.remove('hidden');
-
-                document.getElementById('my-name').textContent = currentUser.username;
-
-                // Показываем кнопку управления пользователями только для админа
-                if (currentUser.username === 'admin') {
-                    document.getElementById('admin-btn').classList.remove('hidden');
-                }
-
-                initSocket();
-            } catch (e) {
-                localStorage.removeItem('token');
-                localStorage.removeItem('encryptedChatKeys'); // 🔐 Очищаем при ошибке
-            }
-        };
-    </script>
+    <!-- MODAL BACKGROUND SETTINGS -->
+    <div id="background-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 modal-overlay">
+        <div class="bg-zinc-900 rounded-3xl p-8 max-w-2xl w-full modal-panel">
+            <h3 class="text-2xl font-semibold mb-6 flex items-center gap-3">
+                <i class="fa-solid fa-image text-emerald-400"></i> Фон чата
+            </h3>
+            <div class="background-grid mb-6" id="background-grid">
+                <button type="button" class="background-option" data-bg-theme="aurora">
+                    <span class="background-swatch theme-aurora"></span>
+                    <span class="background-meta">
+                        <span class="background-title">Аврора</span>
+                        <span class="background-hint">Мягкое северное сияние</span>
+                    </span>
+                </button>
+                <button type="button" class="background-option" data-bg-theme="forest">
+                    <span class="background-swatch theme-forest"></span>
+                    <span class="background-meta">
+                        <span class="background-title">Лес</span>
+                        <span class="background-hint">Глубокие зелёные тона</span>
+                    </span>
+                </button>
+                <button type="button" class="background-option" data-bg-theme="lagoon">
+                    <span class="background-swatch theme-lagoon"></span>
+                    <span class="background-meta">
+                        <span class="background-title">Лагуна</span>
+                        <span class="background-hint">Прохладный морской оттенок</span>
+                    </span>
+                </button>
+                <button type="button" class="background-option" data-bg-theme="sunset">
+                    <span class="background-swatch theme-sunset"></span>
+                    <span class="background-meta">
+                        <span class="background-title">Закат</span>
+                        <span class="background-hint">Тёплые вечерние цвета</span>
+                    </span>
+                </button>
+                <button type="button" class="background-option" data-bg-theme="dunes">
+                    <span class="background-swatch theme-dunes"></span>
+                    <span class="background-meta">
+                        <span class="background-title">Дюны</span>
+                        <span class="background-hint">Песчаный пейзаж</span>
+                    </span>
+                </button>
+            </div>
+            <div class="flex gap-3">
+                <button id="close-background-modal-btn" type="button" class="flex-1 py-4 border border-zinc-700 rounded-2xl hover:bg-zinc-800">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/app.js"></script>
 </body>
 </html>
+
+

@@ -1,18 +1,14 @@
 [
   {
     "username": "admin",
-    "passwordHash": "$2b$10$xvA5t8.McMpvtutLXyy4TOQ3VU5I9w0ZojqhwbDzb8ibzm.YZB7Na"
+    "passwordHash": "$2b$12$Lj2HeqMsLzCNBzrEIFl9tO6jYzkLFEyEuznYXAQRyEOmIEpbcEkwq",
+    "sessionVersion": 2,
+    "passwordChangedAt": 1776596385362
   },
   {
     "username": "trefmat",
-    "passwordHash": "$2b$10$bhd8jkL0VS4LkoQW7oNE7ulvlMAlZU1tbKIvFcwp.gc7Tm90XAcB2"
-  },
-  {
-    "username": "illiuzzia",
-    "passwordHash": "$2b$10$PQYrG7t8r2daNU3N8zKHJejr97W5T5A6c7LtpZ1Ms7O3vr9Y9H9Xm"
-  },
-  {
-    "username": "ninman",
-    "passwordHash": "$2b$10$9Y4NGvT55tdr0OtkEhz7lemfed3N9DFGAFFCCnIa0g7VRwwf7gVL2"
+    "passwordHash": "$2b$12$xD3FWwDwbHYU7jxlN3qTXOrVQMElKv3uEkDr35FvlwX0D9REH52m.",
+    "sessionVersion": 1,
+    "passwordChangedAt": 1776601859651
   }
 ]

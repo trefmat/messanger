@@ -1,72 +1,24 @@
 [
   {
-    "id": "1772109241940",
-    "chatId": "admin-trefmat",
-    "from": "trefmat",
-    "cipher": "U2FsdGVkX19QcDN91SoB1P6hkCle6BllWs4JEfml7Us=",
-    "time": "16:34"
-  },
-  {
-    "id": "1772109244959",
-    "chatId": "admin-trefmat",
-    "from": "trefmat",
-    "cipher": "U2FsdGVkX1/viYE5IojAkBZQUjoOzm2qeQc2FArfX6c=",
-    "time": "16:34"
-  },
-  {
-    "id": "1772109393631",
-    "chatId": "admin-trefmat",
+    "id": "51652db9-cd5d-42e2-9052-3fe9ddf48b7f",
+    "chatId": "group:dbefb488-2c45-4238-950f-db3c2c94480b",
     "from": "admin",
-    "cipher": "U2FsdGVkX18mG5rjF37wySCbYvChSplR9eoucML7hy0=",
-    "time": "16:36"
-  },
-  {
-    "id": "1772109408231",
-    "chatId": "admin-trefmat",
-    "from": "trefmat",
-    "cipher": "U2FsdGVkX1+BrkF4UoJBbWy1UJRz6eicRNvnM+JDaQo=",
-    "time": "16:36"
-  },
-  {
-    "id": "1772112859307",
-    "chatId": "illiuzzia-trefmat",
-    "from": "illiuzzia",
-    "cipher": "U2FsdGVkX1+Pxkvc9GUs1CzAGHAVz0GhlcNth7b07fk=",
-    "time": "17:34"
-  },
-  {
-    "id": "1772112908284",
-    "chatId": "illiuzzia-trefmat",
-    "from": "trefmat",
-    "cipher": "U2FsdGVkX1973zGgmbDbLuRXSZ28+OZp25E26kypiX8=",
-    "time": "17:35"
-  },
-  {
-    "id": "1772122295355",
-    "chatId": "ninman-trefmat",
-    "from": "trefmat",
-    "cipher": "U2FsdGVkX1+NF1bfhEbDHjWaNOEyiDP8ZkSS+duFbj4=",
-    "time": "20:11"
-  },
-  {
-    "id": "1772122302975",
-    "chatId": "ninman-trefmat",
-    "from": "ninman",
-    "cipher": "U2FsdGVkX19UBnewHqSiXggTA0fhtzGprvxFrIyR/B0=",
-    "time": "20:11"
-  },
-  {
-    "id": "1772122317838",
-    "chatId": "ninman-trefmat",
-    "from": "trefmat",
-    "cipher": "U2FsdGVkX18rcWBxrhKfbNE6fYfD/NHVbe8DRPAoJzk=",
-    "time": "20:11"
-  },
-  {
-    "id": "1772122319033",
-    "chatId": "ninman-trefmat",
-    "from": "ninman",
-    "cipher": "U2FsdGVkX1/z/UyNSsa+1cbL1O3yRmyYgK259lkW//g=",
-    "time": "20:11"
+    "kind": "file",
+    "time": "00:40",
+    "timestamp": 1776631251862,
+    "file": {
+      "id": "file_1776631251841_977b6f148dd5",
+      "storageName": "file_1776631251841_977b6f148dd5.bin",
+      "name": "qr-code(1).png",
+      "mimeType": "image/png",
+      "size": 46321,
+      "encryptedSize": 46336,
+      "crypto": {
+        "v": 2,
+        "s": "Ow8Myq7YY1sIC6/7RWMTiA==",
+        "iv": "dDkxcd3Qxb/r4M/hVq17Dg==",
+        "mac": "VJLRxCNkE19rElC0ez0gqzUUORBWegVuw/uwfbdfgqo="
+      }
+    }
   }
 ]
